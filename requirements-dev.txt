@@ -1,0 +1,4 @@
+# Herramientas de desarrollo: pruebas y estilo (incluye las de requirements.txt).
+-r requirements.txt
+pytest==8.3.4
+ruff==0.8.4

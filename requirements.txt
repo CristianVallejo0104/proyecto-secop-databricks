@@ -1,0 +1,6 @@
+# Dependencias para ejecutar la lógica en local / Codespaces / CI.
+# Versiones exactas (==) para que todos obtengamos el mismo resultado.
+# En Databricks NO se instalan: el entorno serverless ya trae pyspark,
+# requests, mlflow y scikit-learn (sus versiones se registran en MLflow).
+pyspark==4.0.1
+requests==2.32.3
