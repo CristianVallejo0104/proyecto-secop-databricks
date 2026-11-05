@@ -84,7 +84,14 @@ def test_separar_localizacion(spark):
 )
 def test_separar_duracion(spark, texto, numero, unidad, dias):
     df = spark.createDataFrame([(texto,)], "x string")
-    fila = df.withColumns(L.separar_duracion("x")).first()
+    fila = (
+        df.withColumns(L.separar_duracion("x"))
+        .withColumn(
+            "duracion_dias_declarada",
+            L.dias_desde_duracion("duracion_numero", "duracion_unidad"),
+        )
+        .first()
+    )
     assert fila["duracion_numero"] == numero
     assert fila["duracion_unidad"] == unidad
     assert fila["duracion_dias_declarada"] == dias

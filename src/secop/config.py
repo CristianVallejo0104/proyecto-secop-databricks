@@ -29,12 +29,18 @@ def ruta_anio(anio: int) -> str:
 
 
 TABLA_BRONCE = tabla("bronze_contratos")
+# Plata (10 tablas en 3FN; ver src/secop/plata.py)
+TABLA_DIM_DEPARTAMENTO = tabla("dim_departamento")
+TABLA_DIM_MUNICIPIO = tabla("dim_municipio")
 TABLA_DIM_ENTIDAD = tabla("dim_entidad")
 TABLA_DIM_PROVEEDOR = tabla("dim_proveedor")
+TABLA_DIM_FAMILIA = tabla("dim_familia_unspsc")
 TABLA_DIM_CATEGORIA = tabla("dim_categoria")
+TABLA_DIM_PROCESO = tabla("dim_proceso")
 TABLA_CONTRATO = tabla("contrato")
 TABLA_FUENTE_RECURSO = tabla("contrato_fuente_recurso")
 TABLA_EJECUCION = tabla("contrato_ejecucion")
+# Oro
 TABLA_ORO = tabla("gold_contratos")
 
 # --- Reglas de limpieza ------------------------------------------------------

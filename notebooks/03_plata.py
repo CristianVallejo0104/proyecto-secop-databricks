@@ -1,24 +1,37 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 03 · Capa plata: modelo normalizado
+# MAGIC # 03 · Capa plata: modelo relacional en tercera forma normal (3FN)
 # MAGIC
-# MAGIC **Qué hace:** lee `bronze_contratos` y construye seis tablas limpias y relacionadas:
+# MAGIC **Qué hace:** lee `bronze_contratos` y construye **10 tablas** limpias y relacionadas,
+# MAGIC verifica en los datos las dependencias funcionales en que se basa el diseño, y comprueba
+# MAGIC llaves primarias e integridad referencial.
 # MAGIC
-# MAGIC | Tabla | Llave | Contenido |
+# MAGIC | Tabla | Llave primaria | Contenido |
 # MAGIC |---|---|---|
-# MAGIC | `dim_entidad` | `codigo_entidad` | Entidad compradora (un solo nombre por código) |
-# MAGIC | `dim_proveedor` | `codigo_proveedor` | Código interno y tipo de documento. **Sin datos personales** |
-# MAGIC | `dim_categoria` | `codigo_categoria` | Código UNSPSC, familia y segmento |
+# MAGIC | `dim_departamento` | `departamento` | Departamento y su país |
+# MAGIC | `dim_municipio` | `departamento` + `municipio` | Municipios (llave compuesta: hay nombres repetidos entre departamentos) |
+# MAGIC | `dim_entidad` | `codigo_entidad` | Entidad compradora; ubicación como FK (departamento, municipio) |
+# MAGIC | `dim_proveedor` | `codigo_proveedor` | Código interno, tipo de documento y si es grupo. **Sin datos personales** |
+# MAGIC | `dim_familia_unspsc` | `familia_unspsc` | Familia UNSPSC y su segmento |
+# MAGIC | `dim_categoria` | `codigo_categoria` | Código UNSPSC y FK a su familia |
+# MAGIC | `dim_proceso` | `proceso_de_compra` | Modalidad y justificación (son del proceso, no del contrato) |
 # MAGIC | `contrato` | `id_contrato` | Lo que se sabe **al firmar** |
 # MAGIC | `contrato_fuente_recurso` | `id_contrato` + `fuente` | Fuentes de recursos en formato largo |
 # MAGIC | `contrato_ejecucion` | `id_contrato` | Lo que pasa **después** de firmar (estado, pagos, días añadidos) |
 # MAGIC
-# MAGIC **¿Por qué normalizar?** Cada dato vive en un solo lugar (el nombre de una entidad no se
-# MAGIC repite en 100.000 filas), y separar "al firmar" de "después" hace muy difícil usar por
-# MAGIC error una variable con fuga de información.
+# MAGIC **Formas normales:**
+# MAGIC - **1FN** (valores atómicos, sin grupos repetidos): la localización "País, Departamento,
+# MAGIC   Ciudad" se separa; "6 Mes(es)" pasa a número y unidad; las 6 columnas de fuentes de
+# MAGIC   recursos pasan a filas.
+# MAGIC - **2FN** (con llave compuesta, todo depende de la llave completa): en
+# MAGIC   `contrato_fuente_recurso`, el valor depende del contrato **y** de la fuente; `dim_municipio`
+# MAGIC   no tiene atributos que dependan solo del departamento (el país está en `dim_departamento`).
+# MAGIC - **3FN** (sin dependencias transitivas): la modalidad depende del proceso, no del contrato;
+# MAGIC   el segmento depende de la familia, no del código; el país depende del departamento.
+# MAGIC   Tampoco se guardan datos calculables (los días de duración se calculan en oro).
 # MAGIC
 # MAGIC Toda la lógica está en `src/secop/plata.py` (probada con pytest). Aquí solo se lee,
-# MAGIC se llama a las funciones y se escribe.
+# MAGIC se llama a las funciones, se escribe y se verifica.
 
 # COMMAND ----------
 
@@ -65,11 +78,29 @@ bronce = spark.table(config.TABLA_BRONCE)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2. Construir y escribir las tablas
+# MAGIC ## 2. Dependencias funcionales: ¿los datos cumplen lo que supone el diseño?
+# MAGIC
+# MAGIC Normalizar se basa en **dependencias funcionales**: "X → Y" significa que cada valor de X
+# MAGIC tiene un único valor de Y (por ejemplo, cada proceso de compra tiene una sola modalidad).
+# MAGIC Aquí se cuenta, en los datos reales, cuántos valores de X aparecen con más de un Y.
+# MAGIC
+# MAGIC - **0 violaciones:** la dependencia se cumple y la tabla está bien separada.
+# MAGIC - **Más de 0:** hay datos inconsistentes en la fuente. La dimensión los resuelve con una
+# MAGIC   regla explícita (el nombre más largo o el valor más reciente). Anotar el número en
+# MAGIC   `docs/informe.md`. Referencia: en 2019, "entidad → nombre" tenía 8 casos (nombre y sigla).
+
+# COMMAND ----------
+
+display(plata.revisar_dependencias(bronce))
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. Construir y escribir las 10 tablas
 # MAGIC
 # MAGIC Cada tabla se escribe con `overwrite` (se reconstruye completa: es pequeña y así el
 # MAGIC resultado no depende de ejecuciones anteriores) y `overwriteSchema` (si cambiamos una
-# MAGIC columna, la tabla se actualiza).
+# MAGIC columna, la tabla se actualiza). Se escriben en orden: primero las tablas padre.
 # MAGIC
 # MAGIC **Nota sobre serverless:** no usamos `cache()`/`persist()` (no están disponibles). Cada
 # MAGIC tabla recalcula desde bronce; con ~500 mil filas es rápido. Si fuera lento, la solución
@@ -77,89 +108,102 @@ bronce = spark.table(config.TABLA_BRONCE)
 
 # COMMAND ----------
 
-TABLAS = {
-    config.TABLA_DIM_ENTIDAD: plata.construir_dim_entidad(bronce),
-    config.TABLA_DIM_PROVEEDOR: plata.construir_dim_proveedor(bronce),
-    config.TABLA_DIM_CATEGORIA: plata.construir_dim_categoria(bronce),
-    config.TABLA_CONTRATO: plata.construir_contrato(bronce),
-    config.TABLA_FUENTE_RECURSO: plata.construir_fuente_recurso(bronce),
-    config.TABLA_EJECUCION: plata.construir_ejecucion(bronce),
-}
-
-for nombre, df in TABLAS.items():
+for nombre_corto, df in plata.construir_plata(bronce).items():
     exigir_sin_personales(df.columns)  # ninguna tabla de plata puede tener datos personales
     (
         df.write.format("delta")
         .mode("overwrite")
         .option("overwriteSchema", "true")
-        .saveAsTable(nombre)
+        .saveAsTable(config.tabla(nombre_corto))
     )
-    print("escrita:", nombre)
+    print("escrita:", config.tabla(nombre_corto))
+
+# Desde aquí se trabaja con las tablas YA escritas (no con los planes en memoria).
+t = {nombre: spark.table(config.tabla(nombre)) for nombre in plata.CONSTRUCTORES}
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Integridad referencial
-# MAGIC Cada llave foránea debe existir en su tabla padre. `left_anti` devuelve las filas del
-# MAGIC hijo **sin** pareja en el padre: el conteo debe ser **0**. Si no lo es, el notebook se
-# MAGIC detiene (mejor fallar aquí que entrenar con datos rotos).
+# MAGIC ## 4. Llaves primarias: únicas y sin nulos
+# MAGIC Una llave primaria identifica cada fila: no puede repetirse ni estar vacía.
 
 # COMMAND ----------
 
-t = {nombre.split(".")[-1]: spark.table(nombre) for nombre in TABLAS}
-revisiones = [
-    ("contrato", "dim_entidad", "codigo_entidad"),
-    ("contrato", "dim_proveedor", "codigo_proveedor"),
-    ("contrato", "dim_categoria", "codigo_categoria"),
-    ("contrato_fuente_recurso", "contrato", "id_contrato"),
-    ("contrato_ejecucion", "contrato", "id_contrato"),
-]
+unicidad = []
+for tabla_nombre, llave in plata.LLAVES_PRIMARIAS.items():
+    nulos = F.lit(False)
+    for c in llave:
+        nulos = nulos | F.col(c).isNull()
+    fila = (
+        t[tabla_nombre]
+        .agg(
+            F.count("*").alias("filas"),
+            F.countDistinct(*llave).alias("llaves"),
+            F.sum(nulos.cast("long")).alias("nulos"),
+        )
+        .first()
+    )
+    unicidad.append(
+        (tabla_nombre, "+".join(llave), fila["filas"], fila["llaves"], fila["nulos"] or 0)
+    )
+display(
+    spark.createDataFrame(
+        unicidad, "tabla string, llave string, filas long, llaves_distintas long, llaves_nulas long"
+    )
+)
+assert all(f == k and n == 0 for _, _, f, k, n in unicidad), "Llave primaria duplicada o nula"
+print("Llaves primarias: OK")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 5. Integridad referencial
+# MAGIC Cada llave foránea debe existir en su tabla padre (incluida la llave compuesta
+# MAGIC departamento + municipio). `left_anti` devuelve las filas del hijo **sin** pareja en el
+# MAGIC padre: el conteo debe ser **0**. Si no lo es, el notebook se detiene (mejor fallar aquí
+# MAGIC que entrenar con datos rotos).
+
+# COMMAND ----------
+
 resultados = []
-for hijo, padre, llave in revisiones:
+for hijo, padre, llave in plata.RELACIONES:
     huerfanas = plata.filas_huerfanas(t[hijo], t[padre], llave).count()
-    resultados.append((hijo, padre, llave, huerfanas))
+    texto_llave = llave if isinstance(llave, str) else "+".join(llave)
+    resultados.append((hijo, padre, texto_llave, huerfanas))
 
 display(
     spark.createDataFrame(resultados, "hijo string, padre string, llave string, huerfanas long")
 )
 rotas = [r for r in resultados if r[3] != 0]
 assert not rotas, f"Integridad referencial rota: {rotas}"
-print("Integridad referencial: OK (0 huérfanas en todas las relaciones)")
+print(f"Integridad referencial: OK (0 huérfanas en las {len(resultados)} relaciones)")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 4. Comprobaciones de calidad
-# MAGIC - Llaves únicas en dimensiones y en `contrato`.
+# MAGIC ## 6. Casos que resolvió la normalización
 # MAGIC - Entidades que tenían más de un nombre (en 2019 se observaron 8: nombre completo y sigla).
+# MAGIC - Procesos con más de una modalidad en la fuente (si hay, se usó la más reciente).
+# MAGIC - Municipios con el mismo nombre en varios departamentos (justifican la llave compuesta).
 
 # COMMAND ----------
 
-unicidad = []
-for tabla_nombre, llave in [
-    ("dim_entidad", "codigo_entidad"),
-    ("dim_proveedor", "codigo_proveedor"),
-    ("dim_categoria", "codigo_categoria"),
-    ("contrato", "id_contrato"),
-    ("contrato_ejecucion", "id_contrato"),
-]:
-    fila = (
-        t[tabla_nombre]
-        .agg(F.count("*").alias("filas"), F.countDistinct(llave).alias("llaves"))
-        .first()
-    )
-    unicidad.append((tabla_nombre, fila["filas"], fila["llaves"]))
-display(spark.createDataFrame(unicidad, "tabla string, filas long, llaves_distintas long"))
-assert all(f == k for _, f, k in unicidad), "Hay llaves duplicadas"
-
 display(
     t["dim_entidad"].filter("n_nombres > 1").select("codigo_entidad", "nombre_entidad", "n_nombres")
+)
+display(t["dim_proceso"].filter("n_modalidades > 1").limit(20))
+display(
+    t["dim_municipio"]
+    .groupBy("municipio")
+    .agg(F.count("*").alias("departamentos"))
+    .filter("departamentos > 1")
+    .orderBy(F.desc("departamentos"))
 )
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Vistazo a las limpiezas
+# MAGIC ## 7. Vistazo a las limpiezas
 # MAGIC Estado unificado (ya sin mayúsculas inconsistentes) y duración separada en número y unidad.
 
 # COMMAND ----------
@@ -168,5 +212,5 @@ display(t["contrato_ejecucion"].groupBy("estado_contrato").count().orderBy(F.des
 display(
     t["contrato"]
     .groupBy("duracion_unidad")
-    .agg(F.count("*").alias("contratos"), F.avg("duracion_dias_declarada").alias("dias_promedio"))
+    .agg(F.count("*").alias("contratos"), F.avg("duracion_numero").alias("numero_promedio"))
 )

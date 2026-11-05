@@ -9,7 +9,7 @@ import pytest
 from secop import modelado as M
 from secop import modelos, plata
 from secop.config import COLUMNA_ETIQUETA
-from secop.oro import construir_oro
+from secop.oro import construir_oro_desde_plata
 from secop.sinteticos import generar_filas
 
 
@@ -24,13 +24,7 @@ def oro_grande(spark):
     esquema = StructType([StructField(c, StringType()) for c in COLUMNAS_CRUDAS])
     filas = [tuple(f[c] or None for c in COLUMNAS_CRUDAS) for f in generar_filas(400, 3)]
     bronce = preparar_bronce(spark.createDataFrame(filas, esquema), 2019)
-    oro = construir_oro(
-        plata.construir_contrato(bronce),
-        plata.construir_dim_entidad(bronce),
-        plata.construir_dim_proveedor(bronce),
-        plata.construir_dim_categoria(bronce),
-        plata.construir_ejecucion(bronce),
-    )
+    oro = construir_oro_desde_plata(plata.construir_plata(bronce))
     return M.solo_etiqueta_completa(oro)
 
 

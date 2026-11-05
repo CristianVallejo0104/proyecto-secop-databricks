@@ -15,7 +15,7 @@ from secop.config import (
     VARIABLES_NUMERICAS,
     VARIABLES_PLAZO,
 )
-from secop.limpieza import limpiar_categoria
+from secop.limpieza import dias_desde_duracion, limpiar_categoria
 
 
 def construir_etiqueta(dias_adicionados: str | F.Column) -> F.Column:
@@ -33,18 +33,24 @@ def construir_oro(
     dim_entidad: DataFrame,
     dim_proveedor: DataFrame,
     dim_categoria: DataFrame,
+    dim_familia: DataFrame,
+    dim_proceso: DataFrame,
     ejecucion: DataFrame,
     tope_valor: float = TOPE_VALOR_CONTRATO,
 ) -> DataFrame:
-    """Une las tablas de plata y calcula las variables del modelo.
+    """Une las tablas de plata (desnormaliza) y calcula las variables del modelo.
+
+    Plata está normalizada para guardar bien los datos; oro se desnormaliza a
+    propósito para analizar: una fila por contrato con todo lo necesario, sin
+    tener que repetir 6 joins en cada consulta.
 
     Filtros (cada uno explicado en docs/decisiones.md):
     - fecha de firma conocida (sin ella no hay partición temporal);
     - valor del contrato > 0 (los <= 0 son errores de registro);
     - etiqueta conocida (dias_adicionados no nulo).
     """
-    # Las dimensiones de entidad y categoría son pequeñas: broadcast envía una
-    # copia a cada ejecutor y evita mover (shuffle) la tabla grande de contratos.
+    # Las dimensiones de entidad, categoría y familia son pequeñas: broadcast
+    # envía una copia a cada ejecutor y evita mover (shuffle) la tabla grande.
     entidad = F.broadcast(
         dim_entidad.select(
             "codigo_entidad",
@@ -52,13 +58,19 @@ def construir_oro(
             "sector_entidad",
             "rama_entidad",
             "entidad_centralizada",
-            "departamento_entidad",
+            F.col("departamento").alias("departamento_entidad"),
         )
     )
+    # Categoría -> familia -> segmento: se recorre la jerarquía con dos joins.
     categoria = F.broadcast(
-        dim_categoria.select("codigo_categoria", "familia_unspsc", "segmento_unspsc")
+        dim_categoria.join(F.broadcast(dim_familia), "familia_unspsc", "left").select(
+            "codigo_categoria", "familia_unspsc", "segmento_unspsc"
+        )
     )
-    proveedor = dim_proveedor.select("codigo_proveedor", "tipo_doc_proveedor")
+    proveedor = dim_proveedor.select("codigo_proveedor", "tipo_doc_proveedor", "es_grupo")
+    proceso = dim_proceso.select(
+        "proceso_de_compra", "modalidad_de_contratacion", "justificacion_modalidad"
+    )
     # De ejecución SOLO se toma dias_adicionados, y solo para la etiqueta.
     etiqueta = ejecucion.select(
         "id_contrato", construir_etiqueta("dias_adicionados").alias(COLUMNA_ETIQUETA)
@@ -68,6 +80,7 @@ def construir_oro(
         contrato.join(entidad, "codigo_entidad", "left")
         .join(categoria, "codigo_categoria", "left")
         .join(proveedor, "codigo_proveedor", "left")
+        .join(proceso, "proceso_de_compra", "left")
         .join(etiqueta, "id_contrato", "left")
     )
 
@@ -87,7 +100,9 @@ def construir_oro(
         # firmarse (~48 % en 2019, típico de registros hechos después).
         "dias_firma_a_inicio": F.datediff("fecha_inicio", "fecha_firma"),
         "inicio_antes_de_firma": (F.col("fecha_inicio") < F.col("fecha_firma")).cast("int"),
-        # PLAZO (sospechoso de fuga, ver config.VARIANTES)
+        # PLAZO (sospechoso de fuga, ver config.VARIANTES). Los días de duración
+        # se calculan aquí y no se guardan en plata: son un dato derivado.
+        "duracion_dias_declarada": dias_desde_duracion("duracion_numero", "duracion_unidad"),
         "plazo_dias": F.datediff("fecha_fin", "fecha_inicio"),
     }
     # Las categorías que quedaron NULL por un join sin pareja pasan a "No Definido".
@@ -111,4 +126,17 @@ def construir_oro(
             COLUMNA_ETIQUETA,
             "etiqueta_completa",
         )
+    )
+
+
+def construir_oro_desde_plata(tablas: dict[str, DataFrame]) -> DataFrame:
+    """Atajo: recibe {nombre_corto: DataFrame} de plata y llama a construir_oro."""
+    return construir_oro(
+        contrato=tablas["contrato"],
+        dim_entidad=tablas["dim_entidad"],
+        dim_proveedor=tablas["dim_proveedor"],
+        dim_categoria=tablas["dim_categoria"],
+        dim_familia=tablas["dim_familia_unspsc"],
+        dim_proceso=tablas["dim_proceso"],
+        ejecucion=tablas["contrato_ejecucion"],
     )

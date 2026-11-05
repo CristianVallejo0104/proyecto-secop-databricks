@@ -57,7 +57,8 @@ def _fila_base(i: int, rng: random.Random) -> dict[str, str]:
             "fecha_de_inicio_del_contrato": f"{anio}-{mes:02d}-{dia:02d}T00:00:00.000",
             "fecha_de_fin_del_contrato": f"{anio}-12-31T00:00:00.000",
             "condiciones_de_entrega": "A convenir",
-            "tipodocproveedor": rng.choice(["Cédula de Ciudadanía", "NIT"]),
+            # El tipo de documento depende del proveedor (dependencia funcional real).
+            "tipodocproveedor": "NIT" if (i % 7) % 2 == 0 else "Cédula de Ciudadanía",
             "codigo_proveedor": f"P{i % 7:05d}",
             "es_grupo": "No",
             "es_pyme": rng.choice(["Si", "No"]),
@@ -117,6 +118,38 @@ CASOS_RAROS: list[tuple[str, dict[str, str]]] = [
     ("con prórroga", {"dias_adicionados": "45"}),
     ("días adicionados vacíos", {"dias_adicionados": ""}),
     ("año con etiqueta incompleta", {"fecha_de_firma": "2025-03-01T00:00:00.000"}),
+    # Municipio homónimo: mismo nombre en dos departamentos (llave compuesta).
+    (
+        "municipio homónimo en Antioquia",
+        {
+            "codigo_entidad": "E910",
+            "departamento": "Antioquia",
+            "ciudad": "Barbosa",
+            "localizaci_n": "Colombia, Antioquia, Barbosa",
+        },
+    ),
+    (
+        "municipio homónimo en Santander",
+        {
+            "codigo_entidad": "E911",
+            "departamento": "Santander",
+            "ciudad": "Barbosa",
+            "localizaci_n": "Colombia, Santander, Barbosa",
+        },
+    ),
+    # Un proceso con dos modalidades: viola la dependencia proceso -> modalidad.
+    (
+        "proceso con modalidad A",
+        {"proceso_de_compra": "PROC-DUPLICADO", "modalidad_de_contratacion": "Mínima cuantía"},
+    ),
+    (
+        "mismo proceso con modalidad B",
+        {
+            "proceso_de_compra": "PROC-DUPLICADO",
+            "modalidad_de_contratacion": "Licitación pública",
+            "ultima_actualizacion": "2030-01-01T00:00:00.000",
+        },
+    ),
 ]
 
 

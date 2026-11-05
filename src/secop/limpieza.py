@@ -152,15 +152,16 @@ DIAS_POR_UNIDAD = {"dia": 1.0, "semana": 7.0, "mes": 30.0, "anio": 365.0, "hora"
 
 
 def separar_duracion(c: str | Column) -> dict[str, Column]:
-    """Separa "6 Mes(es)" en número (6), unidad ("mes") y días aproximados (180).
+    """Separa "6 Mes(es)" en número (6) y unidad ("mes"). Esto es 1FN: valores atómicos.
 
     Formatos vistos: "6 Mes(es)", "30 Dia(s)", "1 Año(s)", "No definido".
-    - numero: los dígitos iniciales; NULL si no hay número.
-    - unidad: se identifica por el inicio de la palabra (dia/día, sem, mes, año/ano, hora).
-    - dias: numero x días por unidad; NULL si falta cualquiera de los dos.
+    - duracion_numero: los dígitos iniciales; NULL si no hay número.
+    - duracion_unidad: según el inicio de la palabra (dia/día, sem, mes, año/ano, hora).
+    Los días aproximados NO se guardan aquí (serían un dato calculado, redundante
+    en una tabla normalizada): se calculan en oro con ``dias_desde_duracion``.
     """
     texto = F.lower(F.trim(_col(c)))
-    # regexp_extract devuelve "" si no hay coincidencia; try_cast("" ) -> NULL.
+    # regexp_extract devuelve "" si no hay coincidencia; try_cast("") -> NULL.
     numero = F.regexp_extract(texto, r"^(\d+(?:[.,]\d+)?)", 1)
     numero = F.regexp_replace(numero, ",", ".").try_cast("double")
     # La unidad es la primera palabra después del número.
@@ -172,14 +173,19 @@ def separar_duracion(c: str | Column) -> dict[str, Column]:
         .when(palabra.rlike("^a[ñn]o"), "anio")
         .when(palabra.startswith("hora"), "hora")
     )
-    factor = F.when(unidad == "dia", DIAS_POR_UNIDAD["dia"])
+    return {"duracion_numero": numero, "duracion_unidad": unidad}
+
+
+def dias_desde_duracion(numero: str | Column, unidad: str | Column) -> Column:
+    """Días aproximados = número x días por unidad (mes = 30, año = 365...).
+
+    NULL si falta el número o la unidad. Ejemplo: (6, "mes") -> 180.
+    """
+    u = _col(unidad)
+    factor = F.when(u == "dia", DIAS_POR_UNIDAD["dia"])
     for nombre in ("semana", "mes", "anio", "hora"):
-        factor = factor.when(unidad == nombre, DIAS_POR_UNIDAD[nombre])
-    return {
-        "duracion_numero": numero,
-        "duracion_unidad": unidad,
-        "duracion_dias_declarada": numero * factor,
-    }
+        factor = factor.when(u == nombre, DIAS_POR_UNIDAD[nombre])
+    return _col(numero) * factor
 
 
 def familia_unspsc(c: str | Column) -> Column:
