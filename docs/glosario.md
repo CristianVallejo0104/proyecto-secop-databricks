@@ -59,8 +59,6 @@ dependencias transitivas. La capa plata está en 3FN.
 **GBT (Gradient Boosted Trees):** árboles potenciados; cada árbol nuevo corrige los
 errores de los anteriores. Es nuestro modelo de árboles en MLlib.
 
-**Git folder:** carpeta del workspace de Databricks enlazada a un repositorio de GitHub.
-
 **GitHub Actions / CI:** integración continua; ejecuta automáticamente compilación, ruff,
 validación y pytest en cada push y PR (`.github/workflows/ci.yml`).
 
@@ -87,11 +85,18 @@ derecha. Lo usamos para contar huérfanas (debe dar 0).
 **MLflow (experimento, run):** herramienta para registrar modelos. Un *experimento* agrupa
 *runs*; cada *run* guarda parámetros, métricas, etiquetas y, opcionalmente, el modelo.
 
-**Modo ANSI:** modo estricto de SQL en Spark (activo en serverless): un `cast` inválido
+**Modo ANSI:** modo estricto de SQL en Spark (activado en nuestra sesión): un `cast` inválido
 produce error en lugar de NULL.
+
+**Modo local (Spark):** Spark corriendo en una sola máquina: el driver y los ejecutores
+son hilos de un mismo proceso y cada núcleo procesa una partición. Es como corremos todo
+en el Codespace (`local[*]` = usar todos los núcleos).
 
 **Normalizar:** organizar los datos en varias tablas relacionadas para que cada dato
 esté en un solo lugar, sin redundancia.
+
+**Notebook (Jupyter, `.ipynb`):** documento con celdas de código y de texto que se
+ejecutan una por una. Los nuestros se suben a GitHub sin salidas.
 
 **Partición (Delta):** división física de una tabla por los valores de una columna; aquí
 bronce se particiona por `anio_carga`.
@@ -114,9 +119,6 @@ una condición (p. ej., `anio_carga = 2019`).
 **Sensibilidad (recall):** de los contratos realmente prorrogados, qué proporción detecta
 el modelo.
 
-**Serverless:** cómputo administrado por Databricks sin configurar clústeres. En Free
-Edition: sin `cache`/`persist`, sin RDD ni `sparkContext`, memoria limitada.
-
 **Shuffle:** redistribución de datos entre ejecutores (en joins y agregaciones). Es la
 operación más costosa en Spark.
 
@@ -138,11 +140,7 @@ lugar de fallar.
 **UNSPSC:** clasificador de bienes y servicios de Naciones Unidas. Código de 8 dígitos:
 segmento, familia, clase y producto (p. ej., "V1.80111600" → familia 8011, segmento 80).
 
-**Unity Catalog:** sistema de gobierno de datos de Databricks con nombres de tres niveles:
-`catalogo.esquema.tabla` (aquí `workspace.secop.*`).
 
-**Volume:** espacio de archivos dentro de Unity Catalog (`/Volumes/workspace/secop/raw/`)
-donde guardamos los CSV descargados.
 
 **Winsorización:** recortar valores extremos a un tope. El valor del contrato se recorta en
 2,2e9 (el p99 de 2019 es ≈ 2,17e9) antes de aplicar logaritmo.

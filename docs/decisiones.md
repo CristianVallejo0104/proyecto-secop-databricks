@@ -12,8 +12,9 @@ hicieron X y no Y?" en la sustentación.
 | Ver o recuperar una versión anterior | No | *Time travel*: `VERSION AS OF n`, `DESCRIBE HISTORY` |
 | Rechazar datos con esquema distinto | No | Sí (validación de esquema) |
 
-Delta es Parquet más un registro de transacciones (`_delta_log`). Es el formato por
-defecto de Databricks y de Unity Catalog.
+Delta es Parquet más un registro de transacciones (`_delta_log`). Es un formato
+abierto: funciona igual en un computador (con la librería `delta-spark`) que en
+plataformas como Databricks. Cada tabla es una carpeta en `datos/delta/<tabla>/`.
 
 ## 2. Arquitectura bronce → plata → oro
 
@@ -124,7 +125,7 @@ información nueva: se puede reconstruir en cualquier momento desde plata.
   (nombres, documentos, género, domicilio, nacionalidad y datos bancarios de
   representantes, supervisores y ordenadores, y nombre y documento del proveedor).
 - **La descarga ya no las pide:** el notebook 01 usa `$select` con las columnas
-  permitidas, así esos datos nunca llegan al Volume.
+  permitidas, así esos datos nunca llegan al disco.
 - **Bronce las descarta** si vienen (descargas antiguas de 2019-2020 sí las traen).
   Por eso bronce tiene 75 columnas y no 95: la restricción de privacidad prevalece
   sobre "copiar todo".
@@ -136,9 +137,11 @@ información nueva: se puede reconstruir en cualquier momento desde plata.
 - Un test (`tests/test_esquema_y_privacidad.py`) falla si los nombres de columnas
   personales aparecen en cualquier archivo distinto de `esquema.py`, y otro
   (`tests/test_capas.py`) verifica que ninguna tabla de salida los contenga.
-- Pendiente para el equipo: los CSV antiguos del Volume (2019-2020) aún contienen
-  esas columnas. Recomendación: volver a descargarlos con el notebook 01 y borrar
-  los anteriores (ver runbook).
+- Pendiente para el equipo: los CSV que se descargaron antes con las 95 columnas
+  (2019-2020) contienen esas columnas. Hay que borrarlos donde estén y descargar
+  de nuevo con el notebook 01 (ver `docs/runbook.md` §5).
+- Los notebooks se suben a GitHub **sin salidas** (un test lo exige): así una
+  tabla mostrada durante el análisis nunca termina en el repositorio.
 
 ## 5. Variables excluidas por fuga de información
 
@@ -172,7 +175,7 @@ modelo final es `sin_plazo`. Resultado: PENDIENTE.
 
 | Problema observado (2019) | Regla | Función |
 |---|---|---|
-| Textos en columnas numéricas | `try_cast`: NULL en vez de error (serverless usa modo ANSI) | `a_numero` |
+| Textos en columnas numéricas | `try_cast`: NULL en vez de error (la sesión usa modo ANSI) | `a_numero` |
 | Fechas "2019-03-15T00:00:00.000" | Primeros 10 caracteres → fecha | `a_fecha` |
 | Estado con mayúsculas mezcladas | `initcap` | `limpiar_estado` |
 | "No Definido" en muchas variantes | Una sola categoría "No Definido" | `limpiar_categoria` |
@@ -192,7 +195,7 @@ modelo final es `sin_plazo`. Resultado: PENDIENTE.
   entrenamiento hasta marzo de 2020, validación abril-junio 2020, prueba julio-diciembre 2020.
 - Riesgo conocido: 2020 es el año de la pandemia; el comportamiento de las prórrogas
   pudo cambiar. Cargar más años (2021-2024) reduce ese riesgo; los cortes se
-  cambian con widgets sin editar código.
+  cambian con los parámetros de 06 sin editar código.
 
 ## 9. Partición temporal, pesos y métricas
 
@@ -205,21 +208,43 @@ modelo final es `sin_plazo`. Resultado: PENDIENTE.
   reporta solo para mostrar que engaña.
 - **Umbral** elegido con validación (máximo F1) y aplicado una sola vez en prueba.
 
-## 10. Entorno: Databricks Free Edition (serverless)
+## 10. Entorno: Codespaces con PySpark en modo local (y no Databricks)
 
-| Restricción | Decisión |
+El proyecto se pensó primero para Databricks Free Edition, pero el equipo decidió
+ejecutarlo todo en Python dentro de **GitHub Codespaces**.
+
+| Criterio | Codespaces + PySpark local | Databricks |
+|---|---|---|
+| Entorno igual para los dos | Sí: `devcontainer.json` fija Python, Java y librerías | Sí, pero aparte del repositorio |
+| Mismo lugar que el código | Sí: se programa, prueba y ejecuta en el mismo sitio | No: hay que sincronizar con Git folders |
+| Pruebas automáticas de los notebooks | Sí: la CI ejecuta los mismos `.ipynb` | No directamente |
+| Spark, Delta, MLflow | Sí (modo local) | Sí (cómputo administrado) |
+| Escala | Una máquina (4 núcleos, 16 GB en la opción grande) | Varias máquinas |
+
+**Por qué alcanza:** 2019 y 2020 suman unos 500 mil contratos, que una máquina de
+Codespaces procesa con Spark en modo local. El código es el mismo PySpark que
+correría en un clúster: si la base creciera, solo habría que cambiar dónde se crea
+la sesión (`entorno.crear_spark`).
+
+**Qué es Spark en modo local:** el *driver* y los *ejecutores* son hilos dentro de
+un mismo proceso. Spark igual divide los datos en particiones y las procesa en
+paralelo, una por núcleo. Se ve en la interfaz de Spark (puerto 4040).
+
+| Riesgo o límite | Decisión |
 |---|---|
-| Sin `cache()`/`persist()` | Recalcular desde Delta o materializar pasos intermedios como tablas |
-| Sin RDD ni `sparkContext` | Solo API de DataFrames |
-| 8 GB de memoria | Nada de `toPandas()` sobre tablas grandes; agregar en Spark y mostrar el resultado |
-| MLlib podría fallar | Plan B: scikit-learn sobre una muestra acotada (máx. 200.000 filas por partición), con la preparación en Spark |
-| Modo ANSI | `try_cast` en todas las conversiones |
+| Memoria (8-16 GB según la máquina) | Nada de `toPandas()` sobre tablas grandes: se agrega en Spark y solo se trae el resultado (`entorno.mostrar` usa `limit`) |
+| GBT lento en pocos núcleos | Parámetro `ITER_GBT` y plan B con scikit-learn sobre una muestra acotada (máx. 200.000 filas por partición) |
+| Modo ANSI activado | `try_cast` en todas las conversiones |
+| Disco del Codespace | `datos/` solo guarda los años que se usan; las tablas Delta se regeneran desde los CSV |
+| Cupo gratuito de Codespaces | Detener el Codespace al terminar (runbook §1) |
+| `cache()` | No se usa: cada tabla se materializa en Delta y se lee de ahí; el código sigue siendo compatible con plataformas donde `cache()` no existe |
 
 ## 11. Código en `src/` y notebooks delgados
 
 La lógica vive en funciones puras de `src/secop/` y los notebooks solo leen,
-llaman y escriben. Ventajas: pruebas con pytest sin Databricks, revisión de código
-en PR legible (archivos `.py`, no JSON de notebooks) y reutilización.
+llaman y escriben. Ventajas: pruebas con pytest sin ejecutar el pipeline,
+reutilización, y diffs legibles en los PR (los cambios de lógica están en `.py`;
+los notebooks cambian poco y se suben sin salidas).
 
 ## 12. Cambiar de base de datos
 

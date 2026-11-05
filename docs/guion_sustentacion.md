@@ -1,7 +1,7 @@
 # Guion de sustentación (5 minutos, dos voces)
 
 Voces: **C** = Cristian, **JP** = JP. Los marcadores `[PENDIENTE: ...]` se llenan
-con los resultados reales después de ejecutar los notebooks en Databricks.
+con los resultados reales después de ejecutar los notebooks en el Codespace.
 
 ---
 
@@ -52,9 +52,10 @@ con los resultados reales después de ejecutar los notebooks en Databricks.
   que probamos con pytest y datos sintéticos que imitan los casos raros reales."
 - JP: "Cada push ejecuta GitHub Actions: compila, revisa estilo con ruff, corre las
   pruebas y construye la imagen de Docker."
-- JP: "Con Codespaces cualquiera abre el mismo entorno, y con `make simular` corremos
-  los notebooks completos en local, con Delta y datos sintéticos, antes de ir a
-  Databricks."
+- JP: "Todo corre en GitHub Codespaces: una máquina en la nube con el mismo Python, Java
+  y librerías para los dos. Ahí usamos Spark en modo local, Delta y MLflow."
+- JP: "Y la CI ejecuta de verdad los cinco notebooks del pipeline con datos sintéticos en
+  cada push: si alguien rompe un notebook, GitHub lo marca en rojo."
 
 ## 2:50 – 3:50 · Modelo (C)
 
@@ -98,7 +99,7 @@ con los resultados reales después de ejecutar los notebooks en Databricks.
 
 | Tema | Responde |
 |---|---|
-| Spark: lazy evaluation, acciones, inmutabilidad, broadcast, serverless | Cristian |
+| Spark: lazy evaluation, acciones, inmutabilidad, broadcast, modo local | Cristian |
 | Delta Lake, time travel, `replaceWhere`, capas bronce/plata/oro | Cristian |
 | Modelo: desbalance, métricas, partición temporal, fuga, MLflow | Cristian (JP apoya) |
 | Datos, API Socrata, privacidad, limpieza | JP |

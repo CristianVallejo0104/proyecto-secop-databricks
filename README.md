@@ -17,23 +17,25 @@ señal de que no se cumplió en el tiempo planeado. Nuestra pregunta:
 - **Datos:** "SECOP II - Contratos Electrónicos", API Socrata de datos.gov.co
   (id `jbjy-vk9h`), ~5,67 millones de filas y 95 columnas. Cargados: 2019 y 2020.
 - **Objetivo del repositorio:** demostrar con calidad profesional las herramientas
-  del curso: GitHub, Docker, Codespaces, reproducibilidad, almacenamiento en la nube,
-  Spark/Databricks y Machine Learning con MLflow.
+  del curso: GitHub, Docker, Codespaces, reproducibilidad, almacenamiento con tablas
+  Delta, Spark (PySpark) y Machine Learning con MLflow.
+- **Dónde corre:** todo en Python dentro de **GitHub Codespaces**, con Spark en modo
+  local, tablas Delta y MLflow. Los pasos son notebooks de Jupyter.
 
-**Resultados: PENDIENTES** de ejecución en Databricks (ver [`docs/informe.md`](docs/informe.md)).
+**Resultados: PENDIENTES** de ejecución con los datos reales (ver [`docs/informe.md`](docs/informe.md)).
 Este repositorio no contiene cifras de resultados inventadas.
 
 ## Arquitectura: bronce → plata → oro
 
 ```mermaid
 flowchart LR
-    API["API datos.gov.co<br/>(jbjy-vk9h)"] -->|"01 · descarga por año/mes<br/>reintentos + reanudación<br/>sin columnas personales"| VOL["Volume<br/>/Volumes/workspace/secop/raw<br/>CSV anio=AAAA"]
-    VOL -->|"02 · todo string<br/>replaceWhere por año"| B[("bronze_contratos<br/>Delta, partición anio_carga")]
+    API["API datos.gov.co<br/>(jbjy-vk9h)"] -->|"01 · descarga por año/mes<br/>reintentos + reanudación<br/>sin columnas personales"| VOL["Codespace: datos/raw<br/>CSV anio=AAAA<br/>(nunca se sube a GitHub)"]
+    VOL -->|"02 · todo string<br/>replaceWhere por año"| B[("bronze_contratos<br/>Delta en datos/delta,<br/>partición anio_carga")]
     B -->|"03 · limpieza y normalización<br/>integridad left_anti = 0"| P[("Plata en 3FN<br/>7 dimensiones + 3 hechos")]
     P -->|"04 · etiqueta + variables<br/>conocidas al firmar"| O[("gold_contratos")]
     O -->|05| D["Descriptivo<br/>tasas por grupo"]
     O -->|"06 · partición temporal<br/>pesos de clase"| M["Modelos<br/>logística + GBT"]
-    M --> ML["MLflow<br/>parámetros, métricas,<br/>versión del código"]
+    M --> ML["MLflow (datos/mlruns)<br/>parámetros, métricas,<br/>commit de git"]
 ```
 
 | Capa | Qué contiene | Por qué |
@@ -143,76 +145,64 @@ al modelo, salvo `dias_adicionados` para construir la etiqueta.
 
 | Ruta | Contenido |
 |---|---|
-| `notebooks/01_descarga_exploracion.py` | Descarga reanudable, conteo contra el servidor, exploración |
-| `notebooks/02_bronce.py` | CSV → Delta `bronze_contratos` |
-| `notebooks/03_plata.py` | 10 tablas en 3FN, dependencias funcionales, llaves e integridad |
-| `notebooks/04_oro.py` | `gold_contratos` con etiqueta |
-| `notebooks/05_descriptivo.py` | Tasas de prórroga por grupo |
-| `notebooks/06_modelo.py` | Modelos, métricas, prueba de fuga, MLflow, plan B |
-| `src/secop/` | Toda la lógica, en funciones puras de PySpark |
-| `tests/` | 84 pruebas con pytest sobre datos sintéticos |
+| `notebooks/01_descarga_exploracion.ipynb` | Descarga reanudable, conteo contra el servidor, exploración |
+| `notebooks/02_bronce.ipynb` | CSV → Delta `bronze_contratos` |
+| `notebooks/03_plata.ipynb` | 10 tablas en 3FN, dependencias funcionales, llaves e integridad |
+| `notebooks/04_oro.ipynb` | `gold_contratos` con etiqueta |
+| `notebooks/05_descriptivo.ipynb` | Tasas de prórroga por grupo, con tablas y gráficos |
+| `notebooks/06_modelo.ipynb` | Modelos, métricas, prueba de fuga, MLflow, plan B |
+| `src/secop/` | Toda la lógica, en funciones puras de PySpark (`entorno.py` crea Spark, lee y escribe Delta) |
+| `tests/` | 111 pruebas con pytest sobre datos sintéticos |
+| `scripts/ejecutar_notebooks.py` | Ejecuta los notebooks en orden (datos reales o sintéticos) |
 | `scripts/validar_esquema.py` | Validación del esquema sin Spark (la usa Docker) |
-| `scripts/simular_local.py` | Ejecuta los notebooks 02-06 en local con Delta y datos sintéticos |
 | `docs/` | Decisiones, runbook, guion, preguntas, glosario, informe, flujo Git |
+| `datos/` | **No está en GitHub.** Se crea al ejecutar: CSV, tablas Delta, MLflow |
 
-Los notebooks están en **formato fuente de Databricks** (`.py` con
-`# Databricks notebook source`): se ven como notebooks en Databricks y como código
-legible en GitHub, así los cambios se revisan bien en un pull request.
+Los notebooks se suben **sin salidas** (un test lo exige): así ningún dato real
+termina en GitHub y los cambios se revisan bien en un pull request.
 
 ## Cómo ejecutar
 
-### En Databricks (datos reales)
+El paso a paso completo y los errores previsibles están en
+[`docs/runbook.md`](docs/runbook.md). Resumen:
 
-Resumen (el detalle y los errores previsibles están en
-[`docs/runbook_databricks.md`](docs/runbook_databricks.md)):
+1. En GitHub: **Code** → **Codespaces** → crear un Codespace (mejor de 4 núcleos para
+   los datos reales). Se instala todo solo: Python 3.12, Java 17 y las librerías.
+2. En la terminal del Codespace:
 
-1. Crear el esquema `workspace.secop` y el Volume `raw`.
-2. Enlazar este repositorio como **Git folder**.
-3. Ejecutar en orden `01` → `06`. Cada notebook es autocontenido (lee tablas, no
-   variables de otro notebook) e importa `src/secop` añadiendo la raíz del repo a `sys.path`.
-
-### En local o en Codespaces (datos sintéticos)
-
-Requisitos: Python 3.12 y Java 17+ (Codespaces ya los trae configurados).
-
-```bash
-pip install -r requirements-dev.txt
-```
 ```bash
 make test
 ```
 ```bash
-make lint
+make notebooks-prueba
 ```
 ```bash
-make docker
-```
-
-- `pip install ...`: instala las versiones exactas (`==`) de PySpark, pytest, ruff, etc.
-- `make test`: ejecuta las pruebas con Spark local en modo ANSI (como serverless).
-- `make lint`: revisa estilo y errores con ruff.
-- `make docker`: construye la imagen y valida el esquema con datos sintéticos.
-
-Opcional, para ejecutar los notebooks 02-06 completos en local:
-
-```bash
-pip install -r requirements-simulacion.txt
+make pipeline
 ```
 ```bash
-make simular
+make mlflow
 ```
+
+- `make test`: ejecuta las pruebas con Spark local en modo ANSI.
+- `make notebooks-prueba`: ejecuta los notebooks 02-06 con datos **sintéticos** (5 minutos), sin tocar `datos/`.
+- `make pipeline`: ejecuta los notebooks 01-06 con los datos **reales** (descarga lo que falte de la API) y guarda copias con resultados en `datos/ejecutados/`.
+- `make mlflow`: abre la interfaz de MLflow en el puerto 5000 para comparar los modelos.
+
+También se puede abrir cada notebook en VS Code y pulsar **Run All**, en orden de
+01 a 06. Cada uno es autocontenido: lee tablas de `datos/`, no variables de otro notebook.
 
 ## Herramientas del curso y por qué
 
 | Herramienta | Uso en el proyecto | Por qué |
 |---|---|---|
 | **GitHub** | Ramas `trabajo/*`, PR con plantilla, commits específicos, regla de oro "pull antes de push" ([`docs/flujo_git.md`](docs/flujo_git.md)) | Trabajo en pareja sin pisarse; historial auditable |
-| **GitHub Actions** | `py_compile`, ruff, validación de esquema, pytest y Docker en cada push y PR | Detectar errores antes de llegar a `main` |
+| **GitHub Actions** | `py_compile`, ruff, validación de esquema, pytest, **ejecución de los notebooks con datos sintéticos** y Docker en cada push y PR | Detectar errores antes de llegar a `main` |
 | **Docker** | Imagen `python:3.12-slim` que valida el esquema | Mismo resultado en cualquier máquina |
-| **Codespaces** | `.devcontainer/devcontainer.json` con Python 3.12 y Java 17 | Entorno listo en un clic, igual para los dos |
+| **Codespaces** | Máquina en la nube donde se ejecuta todo; `.devcontainer/devcontainer.json` instala Python 3.12, Java 17 y las librerías | Entorno idéntico para los dos; programar, probar y ejecutar en el mismo lugar |
 | **Reproducibilidad** | Versiones con `==`, semilla 42, versión del código en MLflow, etiquetas de git | Poder repetir exactamente cada resultado |
-| **Almacenamiento en la nube** | Volume de Unity Catalog + tablas Delta | Transacciones, historial (*time travel*), recarga por partición |
-| **Spark / Databricks** | Todas las transformaciones en PySpark sobre serverless | Procesamiento distribuido de millones de filas |
+| **Almacenamiento** | Tablas Delta en el Codespace (`datos/delta/`) | Transacciones, historial (*time travel*), recarga por partición |
+| **Spark (PySpark)** | Todas las transformaciones en PySpark, Spark en modo local | Procesamiento en paralelo; el mismo código correría en un clúster |
+| **Jupyter** | Los 6 pasos son notebooks `.ipynb` con explicaciones | Mostrar el proceso paso a paso en la sustentación |
 | **MLflow** | Un run por variante y algoritmo con parámetros, métricas y commit | Comparar modelos y saber con qué código se obtuvo cada uno |
 
 ## Decisiones clave
@@ -225,19 +215,22 @@ Explicadas en [`docs/decisiones.md`](docs/decisiones.md):
   (fin − inicio) es dudoso, así que se prueba aparte (con y sin plazo).
 - **Partición temporal**, pesos de clase y métricas AUC-ROC, AUC-PR y F1.
 - **2025-2026 no se usan para entrenar:** su etiqueta aún puede cambiar.
-- **Serverless:** sin `cache`/`persist`/RDD/`sparkContext`; `try_cast` por el modo ANSI;
-  nada de `toPandas()` sobre tablas grandes; plan B con scikit-learn sobre una muestra.
+- **Codespaces y no Databricks:** el mismo PySpark en modo local alcanza para unos 500
+  mil contratos, y todo queda en el mismo lugar que el código (ver decisiones §10).
+- **Memoria:** `try_cast` por el modo ANSI; nada de `toPandas()` sobre tablas grandes;
+  plan B con scikit-learn sobre una muestra.
 - **Cambiar de base de datos** implica tocar sobre todo `esquema.py` y `config.py`.
 
 ## Qué está probado y qué no
 
 | Componente | Estado |
 |---|---|
-| Funciones de `src/secop` (limpieza, plata, oro, métricas, pipelines) | ✅ 84 pruebas pytest con Spark 4.0.1 local en modo ANSI, datos sintéticos |
-| Notebooks 02 a 06 de punta a punta | ✅ Ejecutados en local con Delta y datos sintéticos (`make simular`), con MLlib y con el plan B |
+| Funciones de `src/secop` (limpieza, plata, oro, descarga, métricas, pipelines, gráficos) | ✅ 111 pruebas pytest con Spark 4.0.1 local en modo ANSI, datos sintéticos |
+| Notebooks 02 a 06 (`.ipynb`) de punta a punta | ✅ Ejecutados con Jupyter, Delta y datos sintéticos (`make notebooks-prueba`); también en la CI |
+| Lógica de descarga (reintentos, reanudación, sin columnas personales) | ✅ Probada con una API falsa, sin internet |
 | Validación de esquema y estilo | ✅ `scripts/validar_esquema.py`, ruff y py_compile |
-| Notebook 01 (descarga desde la API) | ⚠️ Solo revisado; no se ejecutó (no hay acceso a la API desde el entorno de desarrollo) |
-| Ejecución en Databricks serverless con datos reales | ❌ PENDIENTE: la deben hacer los autores |
+| Notebook 01 contra la API real | ⚠️ No se ejecutó (no hay acceso a la API desde el entorno de desarrollo) |
+| Ejecución con datos reales en el Codespace | ❌ PENDIENTE: la deben hacer los autores (`make pipeline`) |
 | Imagen Docker | ✅ Construida y ejecutada en el entorno de desarrollo; también en CI |
 | Resultados (descriptivos y métricas) | ❌ PENDIENTES |
 
@@ -245,7 +238,7 @@ Detalle de la revisión final: [`docs/lista_de_revision.md`](docs/lista_de_revis
 
 ## Documentación
 
-- [`docs/runbook_databricks.md`](docs/runbook_databricks.md): paso a paso y errores previsibles.
+- [`docs/runbook.md`](docs/runbook.md): paso a paso en Codespaces y errores previsibles.
 - [`docs/decisiones.md`](docs/decisiones.md): por qué cada decisión.
 - [`docs/guion_sustentacion.md`](docs/guion_sustentacion.md): guion de 5 minutos a dos voces.
 - [`docs/preguntas_probables.md`](docs/preguntas_probables.md): preguntas del profesor y respuestas.

@@ -3,7 +3,7 @@
 **Autores:** Cristian (@CristianVallejo0104) y JP (@Juanxct) · Computación en la Nube · USTA Bogotá
 
 > Estado: **resultados PENDIENTES**. Este informe se completa después de ejecutar
-> los notebooks en Databricks. Ninguna cifra de resultados se escribe antes de
+> los notebooks en el Codespace. Ninguna cifra de resultados se escribe antes de
 > obtenerla. Las cifras de "referencia" vienen de la exploración previa de 2019.
 
 ## 1. Introducción
@@ -37,6 +37,10 @@ a los veedores priorizar seguimientos.
 | Tasa de prórroga oro 2020 | — | PENDIENTE |
 
 ## 3. Metodología
+
+Entorno: GitHub Codespaces, Python 3.12, PySpark 4.0.1 en modo local, Delta Lake 4.0.0 y
+MLflow 3.1.1 (versiones fijas en `requirements.txt`). Máquina usada: PENDIENTE
+(núcleos y memoria del Codespace).
 
 1. **Ingesta** por año y mes con reintentos y reanudación (notebook 01).
 2. **Bronce** Delta, texto, particionado por año de carga (02).
@@ -132,5 +136,5 @@ PENDIENTE.
 | Dependencias | `requirements*.txt` con `==` |
 | Semilla | `config.SEMILLA = 42` |
 | Tablas | Delta con historial (`DESCRIBE HISTORY`) |
-| Experimento | MLflow `/Users/<usuario>/secop_prorrogas` |
-| Pruebas | `make test`, `make simular`, GitHub Actions |
+| Experimento | MLflow `secop_prorrogas` en `datos/mlruns/` (`make mlflow`) |
+| Pruebas | `make test`, `make notebooks-prueba`, GitHub Actions |

@@ -81,7 +81,7 @@ Cuando `main` llega a un punto importante (por ejemplo, "pipeline completo
 ejecutado"), se marca con una etiqueta:
 
 ```bash
-git tag -a v0.1 -m "v0.1: bronce, plata y oro ejecutados en Databricks"
+git tag -a v0.1 -m "v0.1: bronce, plata y oro ejecutados con datos reales"
 ```
 ```bash
 git push origin v0.1
@@ -95,13 +95,21 @@ Plan de versiones sugerido (las etiquetas se crean cuando se cumpla cada hito):
 
 | Etiqueta | Hito |
 |---|---|
-| `v0.1` | Bronce, plata y oro ejecutados en Databricks |
+| `v0.1` | Bronce, plata y oro ejecutados con datos reales |
 | `v0.2` | Descriptivo y modelo ejecutados; resultados en `docs/informe.md` |
 | `v1.0` | Versión final sustentada |
 
-## 6. Databricks Git folders
+## 6. Codespaces y notebooks
 
-El repositorio se enlaza en Databricks como *Git folder* (ver
-`docs/runbook_databricks.md`). Desde el menú Git del folder se hace `pull` para
-traer cambios y se puede hacer `commit` y `push`. La regla de oro aplica igual:
-**pull antes de editar y antes de push**.
+Cada uno trabaja en su propio Codespace (ver `docs/runbook.md`). La regla de oro
+aplica igual: **pull antes de editar y antes de push**, desde la terminal del
+Codespace o desde el panel de Git de VS Code.
+
+Los notebooks (`.ipynb`) son archivos JSON. Si se suben con salidas (tablas,
+gráficos), los diffs se vuelven ilegibles y podrían llevar datos reales a GitHub.
+Por eso **se suben sin salidas**: antes de hacer commit, en VS Code usar
+**Clear All Outputs** (o `Ctrl+Shift+P` → "Notebook: Clear All Outputs"). Un test
+(`test_notebooks_se_suben_sin_salidas`) falla en la CI si alguien lo olvida.
+
+Para conservar los resultados, `make pipeline` guarda copias ejecutadas en
+`datos/ejecutados/`, que está en `.gitignore`.
