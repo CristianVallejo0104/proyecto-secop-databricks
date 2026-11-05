@@ -100,6 +100,7 @@ SECOP_ANIOS=2019,2020,2021 make pipeline
 | `SECOP_CORTE_VAL`, `SECOP_CORTE_PRU` | 06 | `2020-04-01`, `2020-07-01` | Partición temporal |
 | `SECOP_MEMORIA` | todos | `4g` | Memoria de Spark (subir a `10g` en una máquina de 16 GB) |
 | `SECOP_DATOS` | todos | `datos/` | Carpeta de datos |
+| `SECOP_TIMEOUT_CELDA` | `make pipeline` | `1200` | Segundos máximos por celda; subirlo si el modelo tarda más con datos reales |
 
 ### Verificaciones esperadas
 

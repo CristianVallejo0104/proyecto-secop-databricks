@@ -21,7 +21,7 @@ solo leyendo el código o con una salvedad; "❌" = no se pudo verificar.
 | 12 | Notebooks 02-06 (`.ipynb`) de punta a punta | ✅ (sintéticos) | `scripts/ejecutar_notebooks.py --sinteticos` con Jupyter (nbclient), Delta 4.0.0 y MLflow: los 5 notebooks corren sin errores; gráficos revisados visualmente. La CI los ejecuta en cada push. |
 | 13 | Notebook 01 contra la API real | ⚠️ | La lógica de descarga está probada con una API falsa (reintentos, reanudación, columnas); la conexión real no se probó (sin acceso a la API desde el entorno de desarrollo). |
 | 14 | Docker | ✅ | Imagen construida y ejecutada en local; "Validación del esquema: OK". También corre en la CI. |
-| 15 | GitHub Actions | ✅ / ⏳ | Ejecuciones anteriores en verde. La del último push (con el nuevo trabajo de notebooks) se revisa al subir. |
+| 15 | GitHub Actions | ✅ | Los tres trabajos en verde en GitHub: pruebas (py_compile, ruff, validación, pytest), Docker y **notebooks** (ejecuta 02-06 con datos sintéticos, unos 8 minutos). Con límite de 30 minutos y de 20 minutos por celda para que nunca quede colgada. |
 | 16 | Codespaces (`devcontainer.json`) | ⚠️ | Revisado; no se abrió un Codespace real desde aquí. |
 | 17 | Ejecución con datos reales | ❌ | Pendiente: la deben hacer los autores con `make pipeline` (ver `docs/runbook.md`). |
 | 18 | Plata en 1FN, 2FN y 3FN | ✅ (sintéticos) | 10 tablas. Tests por forma normal, unicidad y no nulidad de las 10 llaves primarias e integridad en las 10 relaciones (incluida la llave compuesta departamento + municipio). |

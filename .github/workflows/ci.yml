@@ -43,6 +43,7 @@ jobs:
   notebooks:
     # Ejecuta de verdad los notebooks del pipeline (02 a 06) con datos sintéticos.
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

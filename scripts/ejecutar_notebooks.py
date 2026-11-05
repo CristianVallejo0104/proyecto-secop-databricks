@@ -59,9 +59,11 @@ def ejecutar(ruta: Path, guardar_en: Path | None) -> float:
     inicio = time.time()
     nb = nbformat.read(ruta, as_version=4)
     # cwd = carpeta de notebooks, igual que al abrirlo en VS Code o Jupyter.
+    # timeout: segundos máximos por celda. Evita que la CI espere para siempre si algo
+    # se cuelga; con datos reales el modelo puede tardar, por eso se puede ampliar.
     cliente = NotebookClient(
         nb,
-        timeout=None,
+        timeout=int(os.environ.get("SECOP_TIMEOUT_CELDA", "1200")),
         kernel_name="python3",
         resources={"metadata": {"path": str(CARPETA_NOTEBOOKS)}},
     )
