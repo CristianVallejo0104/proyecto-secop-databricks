@@ -1,0 +1,4 @@
+# Solo para scripts/simular_local.py (ejecutar los notebooks en local con Delta).
+-r requirements-dev.txt
+delta-spark==4.0.0
+mlflow==3.1.1

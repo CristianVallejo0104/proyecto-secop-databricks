@@ -2,7 +2,7 @@
 PY ?= python3
 IMAGEN ?= secop-validador:0.1
 
-.PHONY: instalar test lint compilar validar docker
+.PHONY: instalar test lint compilar validar simular docker
 
 instalar:            ## Instala dependencias de desarrollo con versiones fijas
 	$(PY) -m pip install -r requirements-dev.txt
@@ -18,6 +18,9 @@ compilar:            ## Comprueba que todos los .py tengan sintaxis válida
 
 validar:             ## Valida el esquema con datos sintéticos (sin Spark)
 	$(PY) scripts/validar_esquema.py
+
+simular:             ## Ejecuta los notebooks 02-06 en local con datos sintéticos
+	$(PY) scripts/simular_local.py
 
 docker:              ## Construye la imagen y ejecuta la validación dentro
 	docker build -t $(IMAGEN) .
