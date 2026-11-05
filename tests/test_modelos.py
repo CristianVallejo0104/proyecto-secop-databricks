@@ -1,7 +1,7 @@
 """Pruebas de humo de los pipelines: que entrenen y predigan con datos sintéticos.
 
 No evalúan calidad (los datos son aleatorios); comprueban que el código corre
-de principio a fin, para no descubrir errores de programación en Databricks.
+de principio a fin, para no descubrir errores de programación con los datos reales.
 """
 
 import pytest

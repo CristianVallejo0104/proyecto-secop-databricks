@@ -2,7 +2,7 @@
 
 Todo lo que transforma datos vive aquí (no en los notebooks) por dos razones:
 1. Se puede probar con pytest en local, en Codespaces o en GitHub Actions,
-   sin necesidad de Databricks.
+   sin necesidad de ejecutar el pipeline completo.
 2. Los notebooks quedan cortos y se dedican a leer, llamar funciones y escribir.
 """
 

@@ -1,4 +1,4 @@
-"""Agregaciones descriptivas (se ejecutan en Spark y se muestran con display())."""
+"""Agregaciones descriptivas (se calculan en Spark y se muestran con entorno.mostrar)."""
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F

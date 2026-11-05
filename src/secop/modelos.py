@@ -106,7 +106,7 @@ def auc_spark(predicciones, metrica: str) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Plan B: scikit-learn sobre una MUESTRA (si MLlib falla en serverless)
+# Plan B: scikit-learn sobre una MUESTRA (si MLlib falla o es muy lento)
 # ---------------------------------------------------------------------------
 def pipeline_sklearn(categoricas: list[str], numericas: list[str], algoritmo: str):
     """Pipeline equivalente en scikit-learn.

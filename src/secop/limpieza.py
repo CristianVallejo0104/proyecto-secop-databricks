@@ -5,9 +5,10 @@ nuevos, sin escribir tablas ni leer variables globales. Los DataFrames de Spark
 son inmutables: cada función devuelve un objeto nuevo y no modifica el original.
 
 Todas las conversiones usan ``try_cast``: si el texto no se puede convertir,
-devuelve NULL en lugar de detener el trabajo. Esto importa porque Databricks
-serverless trabaja en modo ANSI, donde un ``cast`` normal falla con el primer
-valor inválido (por ejemplo "No definido" en una columna numérica).
+devuelve NULL en lugar de detener el trabajo. Esto importa porque nuestra sesión
+de Spark trabaja en modo ANSI (estricto, como SQL estándar), donde un ``cast``
+normal falla con el primer valor inválido (por ejemplo "No definido" en una
+columna numérica).
 """
 
 from pyspark.sql import Column

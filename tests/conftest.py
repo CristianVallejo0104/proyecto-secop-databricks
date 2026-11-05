@@ -1,7 +1,7 @@
 """Configuración compartida de pytest: sesión de Spark local y datos sintéticos.
 
 Los tests corren con Spark en modo local (un solo proceso en este computador),
-con el modo ANSI activado para parecerse a Databricks serverless, donde un cast
+con el modo ANSI activado, igual que la sesión de los notebooks, donde un cast
 inválido detiene el trabajo en lugar de devolver NULL.
 """
 
