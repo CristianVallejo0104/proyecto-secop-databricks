@@ -46,7 +46,7 @@ pueden ejecutar uno por uno o encadenarlos en un *Job*.
 |---|---|---|---|---|
 | 1 | `01_descarga_exploracion` | API datos.gov.co | CSV en `/Volumes/.../contratos/anio=AAAA/` | `anios`, `modo` |
 | 2 | `02_bronce` | CSV del Volume | `workspace.secop.bronze_contratos` | `anios`, `recrear_tabla` |
-| 3 | `03_plata` | bronce | 6 tablas de plata | — |
+| 3 | `03_plata` | bronce | 10 tablas de plata en 3FN | — |
 | 4 | `04_oro` | plata | `workspace.secop.gold_contratos` | — |
 | 5 | `05_descriptivo` | oro | tablas en pantalla | `min_contratos` |
 | 6 | `06_modelo` | oro | experimento MLflow `/Users/<tú>/secop_prorrogas` | cortes, `motor`, `commit` |
@@ -57,7 +57,9 @@ pueden ejecutar uno por uno o encadenarlos en un *Job*.
 |---|---|---|
 | 01 | Filas locales vs servidor | 2019: 142.090; 2020: 356.623 |
 | 02 | Filas por `anio_carga`; columnas sin datos personales | Igual que 01 |
-| 03 | Integridad referencial | 0 huérfanas en las 5 relaciones (si no, el notebook se detiene) |
+| 03 | Dependencias funcionales | "entidad → nombre": 8 violaciones en 2019 (nombre y sigla); el resto: anotar en el informe |
+| 03 | Llaves primarias | Únicas y sin nulos en las 10 tablas (si no, el notebook se detiene) |
+| 03 | Integridad referencial | 0 huérfanas en las 10 relaciones (si no, el notebook se detiene) |
 | 04 | Filas y tasa de 2019 | Referencia previa: 141.257 filas y 10,99 % |
 | 06 | Runs en MLflow | 1 run padre + 6 hijos (3 variantes × 2 algoritmos) |
 
@@ -103,6 +105,7 @@ antiguas siguen en el historial de Delta. Para borrarlas: recrear la tabla
 | `OutOfMemory` en el driver | `toPandas()` o `collect()` sobre muchas filas | Agregar en Spark y mostrar resultados pequeños; en el plan B bajar `max_filas_muestra` |
 | Error de MLlib en `06` | Alguna etapa no disponible en serverless | `motor = auto` cambia solo a scikit-learn y lo registra en MLflow (`motivo_plan_b`) |
 | No se guarda el modelo en MLflow | Spark ML en serverless requiere un directorio temporal en un Volume | Las métricas se registran igual; el motivo queda en la etiqueta `modelo_no_guardado` |
+| `[TABLE_OR_VIEW_NOT_FOUND]` en `04` (por ejemplo `dim_proceso`) | Se ejecutó `04` sin volver a ejecutar `03` después de actualizar el código | Ejecutar `03` y luego `04` |
 | `CAST_INVALID_INPUT` | Modo ANSI con un `cast` normal | Usar las funciones de `src/secop/limpieza.py` (usan `try_cast`) |
 | La sesión se reinicia o expira | Inactividad del cómputo serverless | Volver a ejecutar el notebook: todos son idempotentes |
 
@@ -115,7 +118,7 @@ antiguas siguen en el historial de Delta. Para borrarlas: recrear la tabla
 
 ## 7. Probar sin Databricks
 
-- `make test`: 54 pruebas con Spark local y datos sintéticos.
+- `make test`: 84 pruebas con Spark local y datos sintéticos.
 - `make simular`: ejecuta los notebooks 02 a 06 en local con Delta y datos sintéticos
   (requiere `pip install -r requirements-simulacion.txt`).
 - `make docker`: valida el esquema dentro de un contenedor.

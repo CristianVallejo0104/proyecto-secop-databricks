@@ -4,7 +4,7 @@
 un resultado: `count()`, `first()`, `display()`, `saveAsTable()`.
 
 **Arquitectura medallón (bronce / plata / oro):** organización de los datos en capas de
-calidad creciente. Bronce = copia fiel en texto; plata = datos limpios y normalizados;
+calidad creciente. Bronce = copia fiel en texto; plata = datos limpios en tercera forma normal;
 oro = tabla lista para análisis y modelo.
 
 **AUC-PR:** área bajo la curva precisión-sensibilidad. Útil con clases desbalanceadas;
@@ -21,8 +21,17 @@ el shuffle de la grande. Se usa con `dim_entidad` y `dim_categoria` en `oro.py`.
 
 **Commit:** fotografía de los cambios en Git, con un mensaje que explica qué cambió y por qué.
 
+**Dependencia funcional (X → Y):** cada valor de X tiene un único valor de Y. Ej.: proceso
+de compra → modalidad. Es la base para decidir en qué tabla va cada atributo.
+
+**Dependencia transitiva:** llave → A → B, donde A no es llave. Ej.: contrato → proceso →
+modalidad. La 3FN las elimina moviendo B a la tabla de A (`dim_proceso`).
+
 **Delta Lake:** formato de tabla sobre Parquet con registro de transacciones: escrituras
 atómicas, esquema validado e historial de versiones.
+
+**Desnormalizar:** unir tablas normalizadas en una sola, a propósito, para analizar más
+rápido. Es lo que hace la capa oro.
 
 **Desbalance de clases:** cuando una clase es mucho menos frecuente que la otra (aquí ~11 %
 de prórrogas). Se trata con pesos de clase y métricas adecuadas.
@@ -43,6 +52,10 @@ son altas.
 **Fuga de información:** usar en el modelo información que no existe al momento de
 predecir (estado, pagos, saldos, días añadidos). Infla las métricas de forma engañosa.
 
+**Formas normales (1FN, 2FN, 3FN):** reglas de diseño de tablas. 1FN: valores atómicos y
+sin grupos repetidos. 2FN: con llave compuesta, todo depende de la llave completa. 3FN: sin
+dependencias transitivas. La capa plata está en 3FN.
+
 **GBT (Gradient Boosted Trees):** árboles potenciados; cada árbol nuevo corrige los
 errores de los anteriores. Es nuestro modelo de árboles en MLlib.
 
@@ -57,6 +70,14 @@ bronce con `replaceWhere` no duplica filas.
 **Integridad referencial:** toda llave foránea debe existir en su tabla padre (p. ej.,
 cada `codigo_entidad` de `contrato` existe en `dim_entidad`).
 
+**Llave compuesta:** llave primaria de varias columnas. Ej.: (departamento, municipio) en
+`dim_municipio`, porque hay municipios con el mismo nombre en distintos departamentos.
+
+**Llave foránea (FK):** columna que apunta a la llave primaria de otra tabla. Ej.:
+`contrato.codigo_entidad` → `dim_entidad.codigo_entidad`.
+
+**Llave primaria (PK):** columna o columnas que identifican cada fila; únicas y no nulas.
+
 **Lazy evaluation (evaluación perezosa):** Spark acumula transformaciones en un plan y solo
 lo ejecuta ante una acción, lo que le permite optimizarlo.
 
@@ -68,6 +89,9 @@ derecha. Lo usamos para contar huérfanas (debe dar 0).
 
 **Modo ANSI:** modo estricto de SQL en Spark (activo en serverless): un `cast` inválido
 produce error en lugar de NULL.
+
+**Normalizar:** organizar los datos en varias tablas relacionadas para que cada dato
+esté en un solo lugar, sin redundancia.
 
 **Partición (Delta):** división física de una tabla por los valores de una columna; aquí
 bronce se particiona por `anio_carga`.

@@ -14,7 +14,7 @@ leyendo el código o con una salvedad; "❌" = no se pudo verificar.
 | 6 | Sin datos ni archivos grandes en el repo | ✅ | No hay CSV/Parquet/JSON de datos versionados (el único `.json` es `devcontainer.json`). Archivo más grande: ~16 KB. |
 | 7 | Sin cifras inventadas | ✅ | Las cifras de los documentos son solo los hechos de partida (142.090, 356.623, 141.257, 10,99 %, ~11 %, 5,67 millones, p99 ≈ 2,17e9, etc.) o derivadas directas (89 % = 100 % − 11 %). Todos los resultados dicen PENDIENTE. Las métricas de la simulación local (datos aleatorios) no se copiaron a ningún documento. |
 | 8 | `py_compile` en todos los `.py` | ✅ | 26 archivos compilan. |
-| 9 | Tests | ✅ | `pytest`: 54 pasan (PySpark 4.0.1, Java 21, modo ANSI, datos sintéticos). |
+| 9 | Tests | ✅ | `pytest`: 84 pasan (PySpark 4.0.1, Java 21, modo ANSI, datos sintéticos). |
 | 10 | ruff | ✅ | `ruff check .` y `ruff format --check .` sin errores. |
 | 11 | Notebooks 02-06 de punta a punta | ✅ (local) | `scripts/simular_local.py` con Delta 4.0.0 y datos sintéticos: los 5 notebooks se ejecutan sin errores con `motor=auto` (MLlib) y con `motor=sklearn` (plan B). |
 | 12 | Notebook 01 (descarga) | ⚠️ | Solo revisión de código y `py_compile`: no hay acceso a la API desde el entorno de desarrollo. |
@@ -24,8 +24,15 @@ leyendo el código o con una salvedad; "❌" = no se pudo verificar.
 | 16 | Ejecución en Databricks serverless | ❌ | No es posible desde aquí. La deben hacer los autores con `docs/runbook_databricks.md`. |
 | 17 | Commits por fase y PR hacia `main` sin merge | ✅ | Un commit por fase (0 a 6), push con pull previo; PR abierto sin merge. |
 | 18 | Sin etiquetas de release | ✅ | No se creó ninguna etiqueta; el plan está en `docs/flujo_git.md`. |
+| 19 | Plata en 1FN, 2FN y 3FN | ✅ (sintéticos) | 10 tablas. Tests específicos por forma normal (`test_1fn_*`, `test_2fn_*`, `test_3fn_*`), unicidad y no nulidad de las 10 llaves primarias e integridad en las 10 relaciones (incluida la llave compuesta departamento + municipio). |
+| 20 | Dependencias funcionales verificadas con datos | ✅ (sintéticos) / ❌ (reales) | `plata.revisar_dependencias` detecta los casos sembrados (entidad con dos nombres, proceso con dos modalidades) y da 0 en el resto. Con datos reales: PENDIENTE. |
 
 ## Riesgos conocidos
+
+0. **Dependencias funcionales con datos reales:** el diseño 3FN supone, por ejemplo, que
+   cada proceso de compra tiene una sola modalidad. Si en los datos reales hay muchas
+   violaciones, la regla "valor más reciente" podría perder información, y habría que
+   discutir si el atributo vuelve a `contrato`. El notebook 03 muestra el conteo.
 
 1. **Serverless no probado:** la simulación local usa Spark clásico, no Spark Connect.
    Puntos con más riesgo: el soporte de MLlib en serverless (hay plan B automático),

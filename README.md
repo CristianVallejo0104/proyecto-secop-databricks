@@ -29,7 +29,7 @@ Este repositorio no contiene cifras de resultados inventadas.
 flowchart LR
     API["API datos.gov.co<br/>(jbjy-vk9h)"] -->|"01 · descarga por año/mes<br/>reintentos + reanudación<br/>sin columnas personales"| VOL["Volume<br/>/Volumes/workspace/secop/raw<br/>CSV anio=AAAA"]
     VOL -->|"02 · todo string<br/>replaceWhere por año"| B[("bronze_contratos<br/>Delta, partición anio_carga")]
-    B -->|"03 · limpieza y normalización<br/>integridad left_anti = 0"| P[("Plata<br/>3 dimensiones + 3 hechos")]
+    B -->|"03 · limpieza y normalización<br/>integridad left_anti = 0"| P[("Plata en 3FN<br/>7 dimensiones + 3 hechos")]
     P -->|"04 · etiqueta + variables<br/>conocidas al firmar"| O[("gold_contratos")]
     O -->|05| D["Descriptivo<br/>tasas por grupo"]
     O -->|"06 · partición temporal<br/>pesos de clase"| M["Modelos<br/>logística + GBT"]
@@ -39,62 +39,101 @@ flowchart LR
 | Capa | Qué contiene | Por qué |
 |---|---|---|
 | **Bronce** | Copia fiel de la fuente, todo texto, sin datos personales | Reprocesar sin volver a descargar (la API es lenta) |
-| **Plata** | Tablas limpias y normalizadas | Un dato en un solo lugar; separar "al firmar" de "después" |
-| **Oro** | Una fila por contrato con etiqueta y variables | Lista para el modelo y los descriptivos |
+| **Plata** | 10 tablas limpias en tercera forma normal (3FN) | Un dato en un solo lugar, sin redundancia; separar "al firmar" de "después" |
+| **Oro** | Una fila por contrato con etiqueta y variables (desnormalizada a propósito) | Lista para el modelo y los descriptivos, sin repetir joins |
 
-### Modelo entidad-relación (plata)
+### Modelo entidad-relación (plata, 3FN)
 
 ```mermaid
 erDiagram
+    dim_departamento ||--o{ dim_municipio : "departamento"
+    dim_municipio ||--o{ dim_entidad : "departamento + municipio"
+    dim_familia_unspsc ||--o{ dim_categoria : "familia_unspsc"
     dim_entidad ||--o{ contrato : "codigo_entidad"
     dim_proveedor ||--o{ contrato : "codigo_proveedor"
     dim_categoria ||--o{ contrato : "codigo_categoria"
+    dim_proceso ||--o{ contrato : "proceso_de_compra"
     contrato ||--o{ contrato_fuente_recurso : "id_contrato"
     contrato ||--|| contrato_ejecucion : "id_contrato"
 
+    dim_departamento {
+        string departamento PK
+        string pais
+    }
+    dim_municipio {
+        string departamento PK,FK
+        string municipio PK
+    }
     dim_entidad {
         string codigo_entidad PK
         string nombre_entidad
-        int n_nombres
+        long n_nombres
+        string nit_entidad
         string orden_entidad
         string sector_entidad
-        string departamento_entidad
+        string rama_entidad
+        string entidad_centralizada
+        string departamento FK
+        string municipio FK
     }
     dim_proveedor {
         string codigo_proveedor PK
         string tipo_doc_proveedor
-        date fecha_primer_contrato
+        string es_grupo
+    }
+    dim_familia_unspsc {
+        string familia_unspsc PK
+        string segmento_unspsc
     }
     dim_categoria {
         string codigo_categoria PK
-        string familia_unspsc
-        string segmento_unspsc
+        string familia_unspsc FK
+    }
+    dim_proceso {
+        string proceso_de_compra PK
+        string modalidad_de_contratacion
+        string justificacion_modalidad
+        long n_modalidades
     }
     contrato {
         string id_contrato PK
         string codigo_entidad FK
         string codigo_proveedor FK
         string codigo_categoria FK
+        string proceso_de_compra FK
         string tipo_de_contrato
-        string modalidad_de_contratacion
+        string es_pyme
         date fecha_firma
         date fecha_inicio
         date fecha_fin
         double valor_contrato
-        double duracion_dias_declarada
+        double duracion_numero
+        string duracion_unidad
     }
     contrato_fuente_recurso {
-        string id_contrato FK
-        string fuente
+        string id_contrato PK,FK
+        string fuente PK
         double valor
     }
     contrato_ejecucion {
-        string id_contrato PK
+        string id_contrato PK,FK
         string estado_contrato
         double valor_pagado
         long dias_adicionados
     }
 ```
+
+**Formas normales** (detalle en [`docs/decisiones.md`](docs/decisiones.md) §3):
+
+| Forma | Regla | Cómo se cumple |
+|---|---|---|
+| **1FN** | Valores atómicos, sin grupos repetidos | Localización separada en departamento y municipio; duración en número + unidad; las 6 columnas de fuentes pasan a filas (`contrato_fuente_recurso`) |
+| **2FN** | Con llave compuesta, todo depende de la llave completa | `valor` depende de (contrato, fuente); el país no está en `dim_municipio` porque depende solo del departamento |
+| **3FN** | Sin dependencias transitivas | Modalidad → `dim_proceso`; segmento → `dim_familia_unspsc`; país → `dim_departamento`; los días de duración (dato calculado) se calculan en oro |
+
+Las dependencias funcionales que justifican el diseño (por ejemplo, "cada proceso
+tiene una sola modalidad") **se comprueban con los datos** en el notebook 03
+(`plata.revisar_dependencias`), y los tests verifican cada forma normal.
 
 `contrato` solo tiene información disponible **al firmar**; todo lo posterior
 (estado, pagos, saldos, días añadidos) está en `contrato_ejecucion` y nunca entra
@@ -106,12 +145,12 @@ al modelo, salvo `dias_adicionados` para construir la etiqueta.
 |---|---|
 | `notebooks/01_descarga_exploracion.py` | Descarga reanudable, conteo contra el servidor, exploración |
 | `notebooks/02_bronce.py` | CSV → Delta `bronze_contratos` |
-| `notebooks/03_plata.py` | Dimensiones, contrato, fuentes, ejecución e integridad |
+| `notebooks/03_plata.py` | 10 tablas en 3FN, dependencias funcionales, llaves e integridad |
 | `notebooks/04_oro.py` | `gold_contratos` con etiqueta |
 | `notebooks/05_descriptivo.py` | Tasas de prórroga por grupo |
 | `notebooks/06_modelo.py` | Modelos, métricas, prueba de fuga, MLflow, plan B |
 | `src/secop/` | Toda la lógica, en funciones puras de PySpark |
-| `tests/` | 54 pruebas con pytest sobre datos sintéticos |
+| `tests/` | 84 pruebas con pytest sobre datos sintéticos |
 | `scripts/validar_esquema.py` | Validación del esquema sin Spark (la usa Docker) |
 | `scripts/simular_local.py` | Ejecuta los notebooks 02-06 en local con Delta y datos sintéticos |
 | `docs/` | Decisiones, runbook, guion, preguntas, glosario, informe, flujo Git |
@@ -194,7 +233,7 @@ Explicadas en [`docs/decisiones.md`](docs/decisiones.md):
 
 | Componente | Estado |
 |---|---|
-| Funciones de `src/secop` (limpieza, plata, oro, métricas, pipelines) | ✅ 54 pruebas pytest con Spark 4.0.1 local en modo ANSI, datos sintéticos |
+| Funciones de `src/secop` (limpieza, plata, oro, métricas, pipelines) | ✅ 84 pruebas pytest con Spark 4.0.1 local en modo ANSI, datos sintéticos |
 | Notebooks 02 a 06 de punta a punta | ✅ Ejecutados en local con Delta y datos sintéticos (`make simular`), con MLlib y con el plan B |
 | Validación de esquema y estilo | ✅ `scripts/validar_esquema.py`, ruff y py_compile |
 | Notebook 01 (descarga desde la API) | ⚠️ Solo revisado; no se ejecutó (no hay acceso a la API desde el entorno de desarrollo) |

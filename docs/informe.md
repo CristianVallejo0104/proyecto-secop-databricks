@@ -29,7 +29,8 @@ a los veedores priorizar seguimientos.
 |---|---|---|
 | Filas bronce 2019 | 142.090 | PENDIENTE |
 | Filas bronce 2020 | 356.623 | PENDIENTE |
-| Huérfanas en integridad referencial | 0 | PENDIENTE |
+| Llaves primarias duplicadas o nulas (10 tablas) | 0 | PENDIENTE |
+| Huérfanas en integridad referencial (10 relaciones) | 0 | PENDIENTE |
 | Filas oro 2019 | 141.257 | PENDIENTE |
 | Tasa de prórroga oro 2019 | 10,99 % | PENDIENTE |
 | Filas oro 2020 | — | PENDIENTE |
@@ -39,13 +40,31 @@ a los veedores priorizar seguimientos.
 
 1. **Ingesta** por año y mes con reintentos y reanudación (notebook 01).
 2. **Bronce** Delta, texto, particionado por año de carga (02).
-3. **Plata** normalizada: 3 dimensiones, contrato, fuentes de recursos y ejecución (03).
+3. **Plata** en tercera forma normal: 7 dimensiones (departamento, municipio, entidad,
+   proveedor, familia UNSPSC, categoría, proceso) y 3 tablas de hechos (contrato, fuentes de
+   recursos y ejecución), con dependencias funcionales verificadas en los datos (03).
 4. **Oro** con etiqueta y 28 variables conocidas al firmar, más 2 de plazo aparte (04).
 5. **Descriptivo** de tasas por grupo (05).
 6. **Modelo** (06): partición temporal (entrenamiento < 2020-04-01 ≤ validación <
    2020-07-01 ≤ prueba), pesos de clase, regresión logística (línea base) y GBT,
    umbral por máximo F1 en validación, tres variantes para detectar fuga en el plazo,
    registro en MLflow.
+
+### 3.1 Dependencias funcionales (notebook 03, sección 2)
+
+| Dependencia | Valores del determinante | Violaciones | Regla aplicada si hay violaciones |
+|---|---|---|---|
+| entidad → nombre | PENDIENTE | PENDIENTE (referencia 2019: 8) | Nombre más largo |
+| departamento → país | PENDIENTE | PENDIENTE | Valor más reciente |
+| proceso → modalidad | PENDIENTE | PENDIENTE | Valor más reciente |
+| proceso → justificación | PENDIENTE | PENDIENTE | Valor más reciente |
+| proveedor → tipo de documento | PENDIENTE | PENDIENTE | Valor más reciente |
+| proveedor → es grupo | PENDIENTE | PENDIENTE | Valor más reciente |
+| categoría → familia | PENDIENTE | PENDIENTE | (debe ser 0: se extrae del código) |
+| familia → segmento | PENDIENTE | PENDIENTE | (debe ser 0: se extrae de la familia) |
+
+Interpretación: PENDIENTE. Si una dependencia tiene muchas violaciones (por ejemplo,
+proceso → modalidad), hay que discutir si el atributo debe volver a la tabla `contrato`.
 
 ## 4. Resultados descriptivos
 

@@ -86,11 +86,49 @@ reemplaza solo `anio_carga = 2019` y deja intactos los demás años. Así el not
 escritor.option("replaceWhere", f"anio_carga = {anio}")
 ```
 
-### 10. ¿Por qué normalizar en plata?
-Cada dato vive en un solo lugar (el nombre de una entidad no se repite en miles de
-filas) y se puede verificar la integridad referencial con `left_anti`. Además separamos
+### 10. ¿Por qué normalizar en plata? ¿En qué forma normal está?
+Plata está en **tercera forma normal (3FN)**. Cada dato vive en un solo lugar (el nombre
+de una entidad no se repite en miles de filas), no hay redundancia que pueda
+contradecirse y la integridad referencial se verifica con `left_anti`. Además separamos
 `contrato` (lo que se sabe al firmar) de `contrato_ejecucion` (lo posterior): usar una
 variable con fuga exigiría un join explícito, difícil de hacer por error.
+
+### 10a. Expliquen 1FN, 2FN y 3FN con ejemplos de su base.
+- **1FN (valores atómicos, sin grupos repetidos):** "Colombia, Antioquia, Medellín" se
+  separó en departamento y municipio; "6 Mes(es)" en número (6) y unidad (mes); las 6
+  columnas de fuentes de recursos pasaron a filas en `contrato_fuente_recurso`.
+- **2FN (con llave compuesta, todo depende de la llave completa):** en
+  `contrato_fuente_recurso` (contrato, fuente), el valor depende de las dos. En
+  `dim_municipio` (departamento, municipio) no guardamos el país, porque depende solo
+  del departamento: eso violaría 2FN.
+- **3FN (sin dependencias transitivas):** la modalidad depende del proceso de compra, no
+  del contrato, y por eso está en `dim_proceso`. El segmento UNSPSC depende de la familia
+  (`dim_familia_unspsc`), no del código de categoría.
+
+### 10b. ¿Cómo saben que esas dependencias se cumplen?
+No lo suponemos: lo medimos. `plata.revisar_dependencias` cuenta, para cada dependencia
+X → Y, cuántos valores de X aparecen con más de un Y en los datos. Si da 0, se cumple.
+Si no da 0 (en 2019 hay 8 entidades con dos nombres), la dimensión aplica una regla
+explícita y lo reportamos.
+
+```python
+display(plata.revisar_dependencias(bronce))  # notebook 03, sección 2
+```
+
+### 10c. ¿Por qué la llave de municipio es compuesta?
+Porque el nombre del municipio no es único: Barbosa existe en Antioquia y en Santander.
+La llave es (departamento, municipio). Hay un test con ese caso exacto.
+
+### 10d. Si plata está normalizada, ¿por qué oro no?
+Oro se desnormaliza a propósito para analizar: una fila por contrato con todo unido,
+sin repetir 6 joins en cada consulta. Normalizar para almacenar, desnormalizar para
+analizar. Oro no tiene información nueva: se reconstruye desde plata cuando se quiera.
+
+### 10e. ¿Por qué `es_pyme` está en contrato y no en proveedor?
+Porque cambia con el tiempo: una empresa puede ser pyme en 2019 y no en 2020. El valor
+depende del contrato (del momento de la firma), así que no hay dependencia funcional
+proveedor → es_pyme. `es_grupo` (consorcio o unión temporal) sí es estable y está en
+`dim_proveedor`.
 
 ### 11. ¿Por qué eliminan los datos personales desde bronce y usan `$select`?
 Lo más seguro es no tener el dato. Para descargas nuevas pedimos a la API solo las

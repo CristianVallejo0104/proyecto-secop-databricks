@@ -20,26 +20,103 @@ defecto de Databricks y de Unity Catalog.
 - **Bronce:** copia fiel de la fuente, todo como texto. Si una regla de limpieza
   estaba mal, se corrige y se reprocesa desde bronce sin volver a descargar
   (la descarga toma horas por la lentitud de la API).
-- **Plata:** datos limpios y normalizados.
+- **Plata:** datos limpios en tercera forma normal (ver §3).
 - **Oro:** una tabla por caso de uso (aquí, el modelo).
 
 Alternativa descartada: ir de CSV directo a la tabla del modelo. Más corto, pero
 cada error obligaría a descargar de nuevo y no habría tablas reutilizables.
 
-## 3. Normalizar en plata
+## 3. Plata en tercera forma normal (3FN)
 
-- **Un dato, un lugar:** el nombre de una entidad está una vez en `dim_entidad`,
-  no repetido en cada contrato. En 2019, 8 códigos de entidad tenían dos nombres
-  (nombre completo y sigla); en una tabla normalizada esa inconsistencia se
-  resuelve en un solo sitio (regla: el nombre más largo).
+### 3.1 Por qué normalizar
+
+- **Un dato, un lugar:** el nombre de una entidad está una vez en `dim_entidad`, no
+  repetido en cada contrato. Si cambia, se corrige en una fila y no en miles.
+- **Sin contradicciones:** en 2019, 8 códigos de entidad tenían dos nombres (completo
+  y sigla). En una tabla normalizada ese conflicto se resuelve una sola vez, con una
+  regla explícita (el nombre más largo).
 - **Separar "al firmar" de "después":** `contrato` solo tiene lo que se sabe al
-  firmar; `contrato_ejecucion` tiene estado, pagos, saldos y días añadidos. Para
-  usar por error una variable posterior habría que unir explícitamente esa tabla.
-- **Formato largo para fuentes de recursos:** las 6 columnas de fuentes se apilan
-  con `stack` en `contrato_fuente_recurso (id_contrato, fuente, valor)`. Agregar
-  una fuente nueva no cambia el esquema.
-- **Integridad referencial verificable:** con `left_anti` se comprueba que toda
-  llave foránea existe en su dimensión (debe dar 0).
+  firmar; `contrato_ejecucion` tiene estado, pagos, saldos y días añadidos.
+- **Integridad verificable:** con `left_anti` se comprueba que toda llave foránea
+  existe en su tabla padre (debe dar 0 en las 10 relaciones).
+
+### 3.2 Base teórica: dependencia funcional
+
+"X → Y" (X determina a Y) significa que cada valor de X tiene **un solo** valor de Y.
+Ejemplo: `proceso_de_compra → modalidad` dice que un proceso tiene una sola modalidad,
+aunque genere varios contratos. Las formas normales se definen con estas dependencias:
+
+| Forma | Regla | Pregunta para revisarla |
+|---|---|---|
+| **1FN** | Cada celda tiene un valor atómico y no hay grupos repetidos | ¿Alguna celda guarda varios datos o hay columnas "dato1, dato2, dato3"? |
+| **2FN** | 1FN + ningún atributo depende solo de **una parte** de una llave compuesta | En las tablas con llave de 2 columnas, ¿algo depende de una sola? |
+| **3FN** | 2FN + ningún atributo que no es llave depende de **otro atributo que no es llave** | ¿Hay cadenas llave → A → B? Entonces B va en otra tabla |
+
+### 3.3 Cómo se aplicó cada forma normal
+
+**1FN: valores atómicos y sin grupos repetidos**
+
+| Antes (bronce) | Problema | Después (plata) |
+|---|---|---|
+| `localizaci_n` = "Colombia, Antioquia, Medellín" | Tres datos en una celda | `departamento`, `municipio` y `pais`, cada uno en su tabla |
+| `duraci_n_del_contrato` = "6 Mes(es)" | Número y unidad juntos | `duracion_numero` = 6, `duracion_unidad` = "mes" |
+| 6 columnas de fuentes (PGN, SGP, regalías...) | Grupo repetido | `contrato_fuente_recurso`: una fila por (contrato, fuente) |
+
+**2FN: dependencia de la llave completa**
+
+Solo aplica a tablas con llave compuesta (las de llave simple cumplen 2FN automáticamente):
+- `contrato_fuente_recurso` (`id_contrato`, `fuente`): `valor` es el aporte de *esa*
+  fuente a *ese* contrato, así que depende de las dos partes. ✔
+- `dim_municipio` (`departamento`, `municipio`): la llave es compuesta porque hay
+  municipios con el mismo nombre en departamentos distintos (por ejemplo, Barbosa en
+  Antioquia y en Santander). El país depende **solo** del departamento; si estuviera
+  aquí violaría 2FN, por eso está en `dim_departamento`. ✔
+
+**3FN: sin dependencias transitivas**
+
+| Dependencia transitiva que había | Solución |
+|---|---|
+| contrato → proceso → modalidad, justificación | Tabla `dim_proceso` |
+| contrato → categoría → familia → segmento | `dim_categoria` (código → familia) y `dim_familia_unspsc` (familia → segmento) |
+| entidad → departamento → país | `dim_departamento`; la entidad guarda solo la FK (departamento, municipio) |
+| contrato → proveedor → es grupo (consorcio o unión temporal) | `es_grupo` pasa a `dim_proveedor` |
+| número + unidad → días de duración (dato calculado) | No se guarda en plata; se calcula en oro con `dias_desde_duracion` |
+| fecha del primer contrato del proveedor (calculable desde `contrato`) | Eliminada |
+
+### 3.4 Casos que podrían parecer violaciones y por qué no lo son
+
+- **`es_pyme` se queda en `contrato`:** una empresa puede ser pyme en 2019 y dejar de
+  serlo en 2020. El valor no depende solo del proveedor sino del momento del
+  contrato, así que `codigo_proveedor → es_pyme` **no** es una dependencia funcional.
+  Además, guardarlo en el contrato conserva el valor al firmar (evita fuga).
+- **`n_nombres` (entidad) y `n_modalidades` (proceso):** son datos de calidad sobre la
+  fuente (cuántos valores distintos traía). No se pueden recalcular desde plata,
+  porque plata ya guarda un solo valor, así que no son redundantes.
+- **`nit_entidad` en `dim_entidad`:** el NIT también identifica a la entidad (es una
+  llave candidata). Que dos llaves se determinen mutuamente no viola 3FN.
+- **`tipo_de_contrato` en `contrato`:** se asume que es del contrato. Si los datos
+  muestran que siempre es igual dentro de un proceso, podría moverse a `dim_proceso`.
+
+### 3.5 Las dependencias se verifican con los datos
+
+Un diseño normalizado es tan bueno como las dependencias en que se basa. Por eso
+`plata.revisar_dependencias` cuenta en bronce, para cada dependencia X → Y, cuántos
+valores de X aparecen con más de un Y. El notebook 03 muestra la tabla:
+
+| Resultado | Interpretación |
+|---|---|
+| 0 violaciones | La dependencia se cumple: la tabla está bien separada |
+| > 0 violaciones | La fuente tiene datos inconsistentes. La dimensión aplica una regla explícita (nombre más largo, valor más reciente) y el número se reporta en el informe |
+
+Referencia: en 2019, "entidad → nombre" tenía 8 violaciones. Las demás: PENDIENTE.
+
+### 3.6 Por qué oro se desnormaliza
+
+Plata se normaliza para **guardar** bien; oro se desnormaliza a propósito para
+**analizar**. El modelo y los descriptivos necesitan una fila por contrato con todo,
+y repetir 6 joins en cada consulta sería lento y propenso a errores. Es el patrón
+estándar: normalizar para almacenar, desnormalizar para analizar. Oro no guarda
+información nueva: se puede reconstruir en cualquier momento desde plata.
 
 ## 4. Datos personales: se eliminan antes de la primera tabla
 
@@ -51,7 +128,8 @@ cada error obligaría a descargar de nuevo y no habría tablas reutilizables.
 - **Bronce las descarta** si vienen (descargas antiguas de 2019-2020 sí las traen).
   Por eso bronce tiene 75 columnas y no 95: la restricción de privacidad prevalece
   sobre "copiar todo".
-- `dim_proveedor` solo guarda el **código interno de SECOP** y el **tipo** de
+- `dim_proveedor` solo guarda el **código interno de SECOP**, si es un **grupo**
+  (consorcio o unión temporal) y el **tipo** de
   documento (persona natural o jurídica), que no identifican a nadie por sí solos.
 - **Textos libres** (descripción, objeto, dirección de ejecución) se quedan en
   bronce, pero no pasan a plata ni a oro: pueden mencionar nombres de personas.
@@ -149,4 +227,5 @@ El proyecto se diseñó para que el profesor pueda pedir otra base:
 - `src/secop/esquema.py`: columnas, personales, posteriores a la firma.
 - `src/secop/config.py`: URL de la API, rutas, tablas y variables del modelo.
 - Las funciones de limpieza son genéricas (reciben nombres de columna).
-- `plata.py` y `oro.py` serían lo único por adaptar a la nueva estructura.
+- `plata.py` y `oro.py` serían lo único por adaptar a la nueva estructura: hay que
+  identificar de nuevo las dependencias funcionales y repetir la normalización (§3).

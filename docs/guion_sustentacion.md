@@ -33,7 +33,10 @@ con los resultados reales después de ejecutar los notebooks en Databricks.
 **En pantalla:** diagrama mermaid del README; luego `DESCRIBE HISTORY` en el notebook 02.
 
 - C: "Organizamos los datos en tres capas. **Bronce**: copia fiel, todo como texto."
-- C: "**Plata**: datos limpios y normalizados. Separamos lo que se sabe al firmar, en la
+- C: "**Plata**: diez tablas en tercera forma normal. Por ejemplo, la modalidad depende
+  del proceso de compra y no del contrato, así que vive en `dim_proceso`; y esas
+  dependencias no las suponemos: las medimos con los datos."
+- C: "Separamos lo que se sabe al firmar, en la
   tabla `contrato`, de lo que pasa después, en `contrato_ejecucion`."
 - C: "**Oro**: una fila por contrato, con la etiqueta y solo variables conocidas al firmar."
 - C: "Todo se guarda en tablas Delta. Aquí se ve el historial: cada carga es una versión
