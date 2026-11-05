@@ -15,7 +15,7 @@ from secop.esquema import (
     FUENTES_DE_RECURSOS,
 )
 from secop.sinteticos import CASOS_RAROS, escribir_csv, generar_filas
-from secop.validacion import comparar_columnas
+from secop.validacion import comparar_columnas, encabezados_distintos
 
 RAIZ = Path(__file__).resolve().parents[1]
 
@@ -73,3 +73,12 @@ def test_nombres_de_columnas_personales_solo_en_esquema():
             if columna in texto:
                 infractores.append((nombre, columna))
     assert infractores == []
+
+
+def test_encabezados_distintos_detecta_mezclas(tmp_path):
+    (tmp_path / "a.csv").write_text("x,y\n1,2\n", encoding="utf-8")
+    (tmp_path / "b.csv").write_text("x,y\n3,4\n", encoding="utf-8")
+    (tmp_path / "c.csv").write_text("x,y,z\n5,6,7\n", encoding="utf-8")
+    rutas = sorted(str(p) for p in tmp_path.glob("*.csv"))
+    assert len(encabezados_distintos(rutas[:2])) == 1
+    assert len(encabezados_distintos(rutas)) == 2

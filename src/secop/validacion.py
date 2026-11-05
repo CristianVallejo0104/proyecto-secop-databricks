@@ -42,3 +42,20 @@ def exigir_sin_personales(columnas: list[str]) -> None:
     presentes = columnas_personales_presentes(columnas)
     if presentes:
         raise ValueError(f"La tabla contiene columnas con datos personales: {presentes}")
+
+
+def encabezados_distintos(rutas: list[str]) -> dict[str, list[str]]:
+    """Lee la primera línea de cada CSV y agrupa los archivos por encabezado.
+
+    Spark lee una carpeta de CSV usando el encabezado del PRIMER archivo y asigna
+    las columnas por posición. Si un archivo tiene otras columnas (por ejemplo,
+    una descarga antigua con 95 columnas y una nueva sin las personales), los
+    datos quedarían desalineados sin ningún error. Esta función lo detecta antes.
+    Devuelve {encabezado: [archivos]}; debe tener una sola llave.
+    """
+    grupos: dict[str, list[str]] = {}
+    for ruta in rutas:
+        with open(ruta, encoding="utf-8") as f:
+            encabezado = f.readline().strip()
+        grupos.setdefault(encabezado, []).append(ruta)
+    return grupos

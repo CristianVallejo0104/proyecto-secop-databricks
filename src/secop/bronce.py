@@ -23,7 +23,9 @@ def preparar_bronce(df_crudo: DataFrame, anio_carga: int) -> DataFrame:
     anio_carga: año de la carpeta de la que se leyó. Es la columna de partición.
     """
     # 1. Si falta una columna, es mejor fallar aquí que en plata con un error confuso.
-    exigir_columnas(df_crudo.columns)
+    #    Se exigen solo las columnas NO personales: la descarga del notebook 01 ya
+    #    no pide las personales a la API, y si vienen (descargas antiguas) se ignoran.
+    exigir_columnas(df_crudo.columns, COLUMNAS_BRONCE)
     # 2 y 3. Seleccionar SOLO las columnas permitidas (las personales quedan fuera)
     #    y forzar tipo string para que todos los años tengan el mismo esquema.
     columnas = [F.col(c).cast("string").alias(c) for c in COLUMNAS_BRONCE]

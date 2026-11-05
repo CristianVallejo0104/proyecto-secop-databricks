@@ -102,6 +102,7 @@ def construir_oro(
         .filter(F.col(COLUMNA_ETIQUETA).isNotNull())
         .select(
             "id_contrato",
+            "codigo_entidad",  # solo para descriptivos; NO es variable del modelo
             "fecha_firma",
             "anio_firma",
             *VARIABLES_CATEGORICAS,
