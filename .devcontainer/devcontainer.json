@@ -1,0 +1,19 @@
+{
+  // Entorno de GitHub Codespaces: mismo Python y Java para todo el equipo.
+  "name": "secop-databricks",
+  // Imagen oficial de Microsoft con Python 3.12.
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    // PySpark necesita Java 17 o superior.
+    "ghcr.io/devcontainers/features/java:1": { "version": "17" },
+    // Para construir y probar la imagen con "make docker" dentro de Codespaces.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  // Al crear el Codespace: instalar dependencias fijadas y validar el esquema.
+  "postCreateCommand": "pip install -r requirements-dev.txt && python scripts/validar_esquema.py",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff", "databricks.databricks"]
+    }
+  }
+}
