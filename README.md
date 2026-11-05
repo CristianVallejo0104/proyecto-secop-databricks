@@ -15,7 +15,7 @@ señal de que no se cumplió en el tiempo planeado. Nuestra pregunta:
 
 - **Etiqueta:** `dias_adicionados > 0` (en 2019, ~11 % de los contratos).
 - **Datos:** "SECOP II - Contratos Electrónicos", API Socrata de datos.gov.co
-  (id `jbjy-vk9h`), ~5,67 millones de filas y 95 columnas. Cargados: 2019 y 2020.
+  (id `jbjy-vk9h`), ~5,67 millones de filas y 95 columnas. Años previstos: 2019 y 2020.
 - **Objetivo del repositorio:** demostrar con calidad profesional las herramientas
   del curso: GitHub, Docker, Codespaces, reproducibilidad, almacenamiento con tablas
   Delta, Spark (PySpark) y Machine Learning con MLflow.
@@ -24,6 +24,125 @@ señal de que no se cumplió en el tiempo planeado. Nuestra pregunta:
 
 **Resultados: PENDIENTES** de ejecución con los datos reales (ver [`docs/informe.md`](docs/informe.md)).
 Este repositorio no contiene cifras de resultados inventadas.
+
+## Contenido
+
+1. [Estado del proyecto](#estado-del-proyecto)
+2. [Qué falta: guía paso a paso](#qué-falta-guía-paso-a-paso)
+3. [Arquitectura: bronce → plata → oro](#arquitectura-bronce--plata--oro)
+4. [Estructura del repositorio](#estructura-del-repositorio)
+5. [Cómo ejecutar](#cómo-ejecutar)
+6. [Herramientas del curso y por qué](#herramientas-del-curso-y-por-qué)
+7. [Decisiones clave](#decisiones-clave)
+8. [Qué está probado y qué no](#qué-está-probado-y-qué-no)
+9. [Documentación](#documentación)
+
+## Estado del proyecto
+
+| Parte | Estado |
+|---|---|
+| Código (`src/secop/`), notebooks 01-06, tests, Docker, Codespaces, CI | ✅ Terminado |
+| Pipeline completo probado con datos **sintéticos** (en local y en la CI) | ✅ Corre sin errores |
+| Documentación (decisiones, runbook, guion, preguntas, glosario) | ✅ Terminada |
+| Ejecución con los datos **reales** de SECOP | ⏳ Pendiente: hay que hacerla en el Codespace |
+| Resultados en `docs/informe.md` y en el guion | ⏳ Pendientes: dependen de la ejecución real |
+
+¿Por qué falta la ejecución real? Los datos se descargan de la API de datos.gov.co, y
+eso solo se puede hacer desde un entorno con internet abierto como el Codespace. Las
+pruebas con datos sintéticos garantizan que el código corre; los números reales salen
+al ejecutar `make pipeline`.
+
+## Qué falta: guía paso a paso
+
+Tiempo estimado: unas pocas horas, casi todo esperando la descarga y el modelo.
+Detalle y solución de errores en [`docs/runbook.md`](docs/runbook.md).
+
+**1. Crear el Codespace** (una vez por persona). En GitHub: botón verde **Code** →
+**Codespaces** → **⋯** → **New with options** → rama `main` → máquina **4-core** →
+**Create codespace**. Se instala todo solo (Python 3.12, Java 17, librerías).
+
+**2. Comprobar que todo funciona** (en la terminal del Codespace):
+
+```bash
+make test
+```
+```bash
+make notebooks-prueba
+```
+
+El primero corre las pruebas y el segundo ejecuta los notebooks con datos inventados.
+Ambos deben terminar sin errores.
+
+**3. Borrar los datos viejos de Databricks.** Si todavía existen los CSV o tablas de la
+descarga anterior en Databricks, bórralos allá: tienen las columnas con datos
+personales. La descarga nueva no las pide.
+
+**4. Ejecutar el pipeline con los datos reales:**
+
+```bash
+make pipeline
+```
+
+Descarga 2019 y 2020 de la API (reanuda si se corta), construye bronce, plata y oro,
+calcula los descriptivos y entrena los modelos. Las copias con resultados quedan en
+`datos/ejecutados/` (se abren en VS Code). Si algo falla, el runbook tiene la tabla de
+errores y soluciones.
+
+**5. Revisar los resultados:** abrir los notebooks de `datos/ejecutados/` y la interfaz
+de MLflow:
+
+```bash
+make mlflow
+```
+
+**6. Copiar los resultados a la documentación**, en una rama nueva:
+
+```bash
+git switch -c trabajo/resultados
+```
+
+Editar `docs/informe.md` (cada `PENDIENTE`) y los marcadores `[PENDIENTE: ...]` de
+`docs/guion_sustentacion.md` con los números reales. Luego, commit específico y la
+regla de oro (pull antes de push):
+
+```bash
+git add docs/informe.md docs/guion_sustentacion.md
+```
+```bash
+git commit -m "Informe: resultados reales de 2019-2020 (descriptivos y modelo)"
+```
+```bash
+git pull --rebase origin main
+```
+```bash
+git push -u origin trabajo/resultados
+```
+
+**7. Pull request y revisión:** en GitHub, abrir el PR de `trabajo/resultados` hacia
+`main`; que el compañero lo revise y apruebe; esperar la CI en verde; **Merge**.
+
+**8. Etiqueta de versión** (desde `main` actualizado):
+
+```bash
+git switch main
+```
+```bash
+git pull origin main
+```
+```bash
+git tag -a v0.1 -m "v0.1: pipeline ejecutado con datos reales"
+```
+```bash
+git push origin v0.1
+```
+
+**9. Ensayar la sustentación** con [`docs/guion_sustentacion.md`](docs/guion_sustentacion.md)
+y [`docs/preguntas_probables.md`](docs/preguntas_probables.md). Al terminar, **detener el
+Codespace** para no gastar horas gratuitas (detenerlo no borra nada; eliminarlo sí borra
+`datos/`).
+
+> Antes de cada commit con notebooks: **Clear All Outputs** en VS Code. La CI falla si un
+> notebook se sube con resultados (así nunca llegan datos reales a GitHub).
 
 ## Arquitectura: bronce → plata → oro
 
