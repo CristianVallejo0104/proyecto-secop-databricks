@@ -179,7 +179,7 @@ def evaluar_mllib(variante: str, algoritmo: str) -> dict:
 # MAGIC ## 5. Plan B: scikit-learn sobre una muestra
 # MAGIC Si MLlib no está disponible en serverless, la preparación sigue en Spark (filtros,
 # MAGIC partición, selección de columnas) y solo una **muestra acotada** pasa a pandas.
-# MAGIC Este es el único `toPandas()` del proyecto, y se hace sobre como máximo `max_filas_muestra`
+# MAGIC Este es el único `toPandas()` de los notebooks, y se hace sobre como máximo `max_filas_muestra`
 # MAGIC filas por partición y unas 30 columnas (decenas de MB), no sobre la tabla completa.
 # MAGIC La muestra es aleatoria con semilla fija dentro de cada partición temporal.
 
@@ -189,7 +189,9 @@ def evaluar_mllib(variante: str, algoritmo: str) -> dict:
 def muestra_pandas(df, columnas):
     n = df.count()
     fraccion = min(1.0, MAX_FILAS / n) if n else 1.0
-    return df.select(*columnas).sample(fraction=fraccion, seed=config.SEMILLA).toPandas()
+    # sample() da un tamaño APROXIMADO; limit() garantiza que nunca se pase del tope.
+    muestra = df.select(*columnas).sample(fraction=fraccion, seed=config.SEMILLA).limit(MAX_FILAS)
+    return muestra.toPandas()
 
 
 def evaluar_sklearn(variante: str, algoritmo: str) -> dict:

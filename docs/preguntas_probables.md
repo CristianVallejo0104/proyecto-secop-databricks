@@ -13,9 +13,9 @@ optimizar el plan completo, por ejemplo, leer solo las columnas necesarias o apl
 los filtros antes de los joins.
 
 ```python
-bronce = spark.table(config.TABLA_BRONCE)          # no lee nada todavía
-contrato = plata.construir_contrato(bronce)        # sigue sin leer
-contrato.write.format("delta").saveAsTable(...)    # aquí se ejecuta todo
+bronce = spark.table(config.TABLA_BRONCE)  # no lee nada todavía
+contrato = plata.construir_contrato(bronce)  # sigue sin leer
+contrato.write.format("delta").saveAsTable(...)  # aquí se ejecuta todo
 ```
 
 ### 2. ¿Diferencia entre transformación y acción? Ejemplos del proyecto.
