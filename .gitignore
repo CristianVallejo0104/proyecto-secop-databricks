@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------
 # REGLA: en este repositorio NO se suben datos, salidas ni secretos.
-# Los datos viven en el Volume de Databricks, no en GitHub.
+# Los datos viven en la carpeta datos/ del Codespace, nunca en GitHub.
 # ---------------------------------------------------------------
 
 # Datos (cualquier formato tabular o comprimido)

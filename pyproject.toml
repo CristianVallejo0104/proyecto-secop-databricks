@@ -8,6 +8,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
+extend-include = ["*.ipynb"]
 target-version = "py312"
 
 [tool.ruff.lint]
@@ -15,6 +16,6 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
-# En los notebooks de Databricks, spark, dbutils y display existen de forma
-# global (los crea el entorno) y los imports van después de configurar sys.path.
-"notebooks/*.py" = ["F821", "E402", "E501", "I001"]
+# En los notebooks los imports van después de configurar sys.path (E402) y cada
+# celda importa lo que necesita (I001); el texto explicativo puede ser largo (E501).
+"notebooks/*.ipynb" = ["E402", "E501", "I001"]

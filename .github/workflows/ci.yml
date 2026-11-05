@@ -40,6 +40,24 @@ jobs:
       - name: Pruebas (pytest)
         run: pytest
 
+  notebooks:
+    # Ejecuta de verdad los notebooks del pipeline (02 a 06) con datos sintéticos.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Instalar dependencias con versiones fijas
+        run: pip install -r requirements-dev.txt
+      - name: Ejecutar notebooks 02-06 con datos sintéticos
+        run: python scripts/ejecutar_notebooks.py --sinteticos
+
   docker:
     runs-on: ubuntu-24.04
     steps:
