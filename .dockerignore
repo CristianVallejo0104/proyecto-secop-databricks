@@ -1,0 +1,11 @@
+# Lo que NO entra a la imagen de Docker.
+.git
+.github
+.devcontainer
+notebooks
+docs
+tests
+**/__pycache__
+*.csv
+*.parquet
+.env

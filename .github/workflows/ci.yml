@@ -1,0 +1,69 @@
+# Integración continua: en cada push y pull request se verifica que el código
+# compile, cumpla el estilo y pase las pruebas. Si algo falla, el PR lo muestra en rojo.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar Java 17 (lo necesita PySpark)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar dependencias con versiones fijas
+        run: pip install -r requirements-dev.txt
+
+      - name: Compilar todos los .py (py_compile)
+        run: python -m py_compile $(git ls-files '*.py')
+
+      - name: Estilo y errores (ruff)
+        run: ruff check .
+
+      - name: Validar esquema con datos sintéticos
+        run: python scripts/validar_esquema.py
+
+      - name: Pruebas (pytest)
+        run: pytest
+
+  notebooks:
+    # Ejecuta de verdad los notebooks del pipeline (02 a 06) con datos sintéticos.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Instalar dependencias con versiones fijas
+        run: pip install -r requirements-dev.txt
+      - name: Ejecutar notebooks 02-06 con datos sintéticos
+        run: python scripts/ejecutar_notebooks.py --sinteticos
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir y ejecutar la imagen
+        run: |
+          docker build -t secop-validador:ci .
+          docker run --rm secop-validador:ci

@@ -1,0 +1,21 @@
+# Configuración de herramientas (este archivo no convierte el repo en paquete instalable).
+
+[tool.pytest.ini_options]
+# Permite "import secop" en los tests sin instalar nada.
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+extend-include = ["*.ipynb"]
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F: errores reales; I: orden de imports; B: errores comunes; UP: sintaxis moderna.
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# En los notebooks los imports van después de configurar sys.path (E402) y cada
+# celda importa lo que necesita (I001); el texto explicativo puede ser largo (E501).
+"notebooks/*.ipynb" = ["E402", "E501", "I001"]
